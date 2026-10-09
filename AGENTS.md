@@ -39,3 +39,11 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+## Wellness project conventions
+
+- Code comments, commits and docs in English. UI strings only via `src/i18n` (ru + en, same keys); use `const L = useT()`.
+- Health formulas and limits live in `src/lib/calc.ts` and must cite a source; add a unit test in `src/lib/__tests__`.
+- All persisted state is `AppData` (`src/store/types.ts`); mutate only through `src/store/actions.ts`.
+- No analytics, ads or trackers. Network access is limited to the optional Open Food Facts search.
+- Run `npm run check` (typecheck + lint + tests) before declaring a task done.

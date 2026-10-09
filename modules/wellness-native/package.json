@@ -1,0 +1,7 @@
+{
+  "name": "wellness-native",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "Small Android helpers for Wellness: hardware step counter and system animation scale."
+}

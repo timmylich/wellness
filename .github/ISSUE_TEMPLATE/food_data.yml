@@ -1,0 +1,10 @@
+name: Food data correction / food pack
+description: Wrong nutrition values in the bundled database, or a new food pack
+labels: [food-data]
+body:
+  - type: textarea
+    attributes:
+      label: Food(s) and correct values
+      description: Per 100 g. Please include a source (package label, official website, USDA, etc.).
+    validations:
+      required: true

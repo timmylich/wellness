@@ -39,3 +39,11 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase config (per-deployment, keep out of the public repo)
+google-services.json
+GoogleService-Info.plist
+
+# Gradle output of the local native module
+modules/*/android/build/
+modules/*/android/.gradle/

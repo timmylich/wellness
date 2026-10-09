@@ -1,0 +1,17 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, what you expected and what you saw instead.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: App version
+      description: Settings → О приложении
+  - type: input
+    attributes:
+      label: Device and Android version

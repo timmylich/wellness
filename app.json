@@ -1,25 +1,73 @@
 {
   "expo": {
-    "name": "wellness-tmp",
-    "slug": "wellness-tmp",
-    "version": "1.0.0",
+    "name": "Wellness",
+    "slug": "wellness",
+    "scheme": "wellness",
+    "version": "0.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true
-    },
+    "userInterfaceStyle": "automatic",
     "android": {
+      "package": "io.github.timmylich.wellness",
+      "versionCode": 4,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#2E9E6A",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.health.READ_STEPS",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.github.timmylich.wellness",
+      "infoPlist": {
+        "NSMotionUsageDescription": "Wellness считает шаги с помощью датчика движения."
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sharing",
+      "expo-localization",
+      "react-native-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
+      "expo-background-task",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#2E9E6A",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#1B6B47"
+          }
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
