@@ -4,7 +4,7 @@
  * a phone set to ×0.5 gets animations twice as fast, and ×0 (off) disables them.
  */
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, LayoutAnimation } from 'react-native';
+import { AccessibilityInfo } from 'react-native';
 
 import { animatorDurationScale } from '../../modules/wellness-native';
 import { getState, useStore } from '../store/store';
@@ -37,8 +37,10 @@ export function useMotion(): boolean {
   return setting && !reduce && SYSTEM_SCALE > 0;
 }
 
-/** Animate the next layout change (list insert/remove). No-op when motion is off. */
-export function animateLayout(duration = 200) {
-  if (!motionEnabled()) return;
-  LayoutAnimation.configureNext(LayoutAnimation.create(dur(duration), 'easeInEaseOut', 'opacity'));
-}
+/**
+ * Formerly LayoutAnimation for list inserts/removals. Disabled: on Android with the new
+ * architecture (Fabric) LayoutAnimation crashes with "addViewAt: The specified child already has
+ * a parent" when a render lands while it runs (seen when adding food). Kept as a no-op so call
+ * sites stay; animate with Animated-based components instead.
+ */
+export function animateLayout(_duration = 200) {}

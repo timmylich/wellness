@@ -11,7 +11,9 @@ import { AppState } from 'react-native';
 
 import type { StepsSource } from '../store/types';
 import { configureBackgroundSteps } from './backgroundSteps';
-import { requestStepPermission, syncDeviceSteps, watchDeviceSteps } from './deviceSteps';
+import { dictFor, resolveLang } from '../i18n';
+import { getState } from '../store/store';
+import { requestStepPermission, startDeviceSteps, stopDeviceSteps, syncDeviceSteps, watchDeviceSteps } from './deviceSteps';
 import { hcSyncSteps } from './healthConnect';
 
 // The live watcher does the work in the foreground; the poll is only a safety net.
@@ -21,7 +23,10 @@ const HC_INTERVAL_MS = 5 * 60 * 1000;
 export function useStepTracking(enabled: boolean, source: StepsSource) {
   useEffect(() => {
     configureBackgroundSteps(enabled);
-    if (!enabled) return;
+    if (!enabled) {
+      stopDeviceSteps();
+      return;
+    }
 
     // Health Connect falls back to the device counter while it is missing or not connected.
     const sync = () =>
@@ -50,6 +55,9 @@ export function useStepTracking(enabled: boolean, source: StepsSource) {
 
     requestStepPermission().then((granted) => {
       if (!granted) console.log('[steps] activity recognition permission denied');
+      // The service also backs up Health Connect until it is connected (the drain is cheap).
+      const L = dictFor(resolveLang(getState().settings.language));
+      if (granted) startDeviceSteps(L.activity.serviceTitle, L.activity.serviceText);
       start();
       watch();
     });

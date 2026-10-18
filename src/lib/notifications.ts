@@ -1,70 +1,36 @@
 /**
- * Notification layer, prepared for Firebase Cloud Messaging (FCM).
- *
- * The app talks only to `NotificationProvider`. The Firebase Cloud Messaging implementation
- * lives in lib/firebaseMessaging.ts and is installed in app/_layout.tsx; forks without
- * Firebase can keep `noopProvider` (see docs/notifications.md).
- *
- * Privacy: push stays opt-in (Settings → Notifications) and no health data is ever sent to
- * the push server — only the device token, if the user enables notifications.
+ * Local notifications (no push server, no Firebase/Play services): pantry expiry reminders and
+ * app-update notices. Delivered by the local native module (modules/wellness-native Reminders.kt).
+ * Everything is opt-in via Settings → Notifications.
  */
-import { setPushToken } from '../store/actions';
-import { getState } from '../store/store';
+import { PermissionsAndroid, Platform } from 'react-native';
 
-export interface NotificationProvider {
-  /** Human-readable id for logs. */
-  name: string;
-  /** Ask the OS for notification permission (Android 13+ POST_NOTIFICATIONS). */
-  requestPermission(): Promise<boolean>;
-  /** Device token for server-side pushes, or null if not supported. */
-  getToken(): Promise<string | null>;
-  /** Subscribe to token rotation. Returns an unsubscribe function. */
-  onTokenRefresh(cb: (token: string) => void): () => void;
-  /** Handle a message received while the app is in the foreground. */
-  onMessage(cb: (msg: PushMessage) => void): () => void;
+import { cancelNotification, notify, scheduleNotification } from '../../modules/wellness-native';
+
+/** Ask for Android 13+ POST_NOTIFICATIONS; older versions grant it at install. */
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return false;
+  if (Number(Platform.Version) < 33) return true;
+  const res = await PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS');
+  return res === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-export interface PushMessage {
-  title?: string;
-  body?: string;
-  /** Free-form payload, e.g. { type: 'waterReminder' }. */
-  data?: Record<string, string>;
+/** Stable positive 31-bit id from a string key (notification ids must be ints). */
+export function notificationId(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (Math.imul(31, h) + key.charCodeAt(i)) | 0;
+  return Math.abs(h) || 1;
 }
 
-/** Default provider: does nothing. Keeps the app fully functional without Firebase. */
-export const noopProvider: NotificationProvider = {
-  name: 'noop',
-  requestPermission: async () => false,
-  getToken: async () => null,
-  onTokenRefresh: () => () => {},
-  onMessage: () => () => {},
-};
-
-let provider: NotificationProvider = noopProvider;
-
-export function setNotificationProvider(p: NotificationProvider) {
-  provider = p;
+export function showNotification(key: string, title: string, body: string, url?: string) {
+  notify(notificationId(key), title, body, url);
 }
 
-export function notificationsAvailable(): boolean {
-  return provider !== noopProvider;
+export function scheduleAt(key: string, at: number, title: string, body: string) {
+  if (at <= Date.now()) return;
+  scheduleNotification(notificationId(key), at, title, body);
 }
 
-/**
- * Called on app start: if the user enabled notifications, (re)register and keep the token
- * up to date. Returns a cleanup function.
- */
-export function initNotifications(onMessage?: (m: PushMessage) => void): () => void {
-  if (!getState().settings.notifications.enabled || provider === noopProvider) return () => {};
-  provider
-    .requestPermission()
-    .then((ok) => (ok ? provider.getToken() : null))
-    .then((token) => token && setPushToken(token))
-    .catch((e) => console.warn(`[notifications] ${provider.name} init failed`, e));
-  const unsubToken = provider.onTokenRefresh(setPushToken);
-  const unsubMsg = provider.onMessage((m) => onMessage?.(m));
-  return () => {
-    unsubToken();
-    unsubMsg();
-  };
+export function cancelScheduled(key: string) {
+  cancelNotification(notificationId(key));
 }

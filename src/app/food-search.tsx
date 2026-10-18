@@ -2,22 +2,26 @@
  * Food picker. Designed for speed without AI: favorites and recent foods are one tap away,
  * and search shows local and online results in one list (local first, online appended).
  */
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
 import { AmountSheet, defaultMeal } from '../components/AmountSheet';
 import { Icon } from '../components/Icon';
 import { Button, Card, Empty, Field, fmt, H, Row, Screen, Segmented, T, Tap } from '../components/ui';
 import { useLang, useT } from '../i18n';
-import { addDays, todayKey } from '../lib/date';
+import { todayKey } from '../lib/date';
 import { cachedFoods, cachedQuery } from '../lib/foodCache';
-import { lookupBarcode, mergeResults, searchLocal, searchOnline } from '../lib/foodApi';
+import { takeHandedOffFood } from '../lib/foodHandoff';
+import { filterOnline, lookupBarcode, mergeResults, searchLocal, searchOnline } from '../lib/foodApi';
 import { animateLayout } from '../lib/motion';
-import { useTheme } from '../lib/theme';
-import { copyDay, logFood, saveFood, toggleFavorite } from '../store/actions';
+import { alpha, useTheme } from '../lib/theme';
+import { logFood, saveFood, toggleFavorite } from '../store/actions';
 import { useStore } from '../store/store';
 import type { Food } from '../store/types';
+
+/** How many recent foods the picker lists. */
+const RECENT_MAX = 15;
 
 function FoodRow({ food, fav, onPress }: { food: Food; fav: boolean; onPress: () => void }) {
   const c = useTheme();
@@ -33,8 +37,16 @@ function FoodRow({ food, fav, onPress }: { food: Food; fav: boolean; onPress: ()
           {L.nutrients.carbs.short} {fmt(p.carbs ?? 0, 1)} {L.food.per100}
         </T>
       </View>
-      <View style={{ backgroundColor: c.cardAlt, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
-        <T size={10} dim>{L.food.sources[food.source]}</T>
+      <View style={{ alignItems: 'flex-end', gap: 3 }}>
+        <View style={{ backgroundColor: c.cardAlt, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+          <T size={10} dim>{L.food.sources[food.source]}</T>
+        </View>
+        {/* Zero/missing salt is usually missing data, not a salt-free product. */}
+        {!p.sodium ? (
+          <View style={{ backgroundColor: alpha(c.high, 0.15), borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 }}>
+            <T size={10} color={c.high}>{L.food.noSalt}</T>
+          </View>
+        ) : null}
       </View>
       <Tap onPress={() => toggleFavorite(food.id)} hitSlop={10}>
         <Icon name="star" size={20} color={fav ? '#F5B301' : c.textDim} />
@@ -61,8 +73,22 @@ export default function FoodSearch() {
   const [barcodeBusy, setBarcodeBusy] = useState(false);
   const [barcodeError, setBarcodeError] = useState(false);
   const [selected, setSelected] = useState<Food | null>(null);
+  // Back from "Create product": open the amount sheet for the new food.
+  useFocusEffect(
+    useCallback(() => {
+      const f = takeHandedOffFood();
+      if (f) setSelected(f);
+    }, []),
+  );
 
-  const q = query.trim();
+  // Typing stays responsive: the result list renders from a deferred copy of the query.
+  const q = useDeferredValue(query.trim());
+  // Heavy lists render after the screen's open animation has started.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 250);
+    return () => clearTimeout(t);
+  }, []);
   const usdaKey = useStore((s) => s.settings.usdaApiKey);
   // Previously seen online foods: searchable offline.
   const [cached, setCached] = useState<Food[]>([]);
@@ -86,7 +112,7 @@ export default function FoodSearch() {
       } catch {
         if (!ctrl.signal.aborted) setRemote((r) => (r?.q === q && r.foods.length ? r : { q, foods: [], error: true }));
       }
-    }, 450);
+    }, 700);
     return () => {
       clearTimeout(timer);
       ctrl.abort();
@@ -94,13 +120,13 @@ export default function FoodSearch() {
   }, [q, canSearchOnline, usdaKey]);
   const current = remote?.q === q ? remote : null;
   const loading = canSearchOnline && !current;
-  const results = mergeResults(local, current?.foods ?? []);
+  const results = mergeResults(local, filterOnline(current?.foods ?? [], q));
 
   // Most recent first, unique by food id.
   const recent = useMemo(() => {
     const seen = new Set<string>();
     const out: Food[] = [];
-    for (let i = foodLog.length - 1; i >= 0 && out.length < 25; i--) {
+    for (let i = foodLog.length - 1; i >= 0 && out.length < RECENT_MAX; i--) {
       const f = foodLog[i].food;
       if (!seen.has(f.id)) {
         seen.add(f.id);
@@ -125,20 +151,31 @@ export default function FoodSearch() {
     else setBarcodeError(true);
   };
 
-  const repeatYesterday = () =>
-    Alert.alert(L.food.repeatTitle, L.food.repeatText, [
-      { text: L.common.cancel, style: 'cancel' },
-      { text: L.food.repeatOk, onPress: () => { copyDay(addDays(date, -1), date); router.back(); } },
-    ]);
-
   const list = (foods: Food[]) => foods.map((f) => <FoodRow key={f.id} food={f} fav={favorites.includes(f.id)} onPress={() => setSelected(f)} />);
 
   return (
     <Screen>
       <Stack.Screen options={{ title: L.nutrition.addFood }} />
-      <Field value={query} onChange={setQuery} numeric={false} placeholder={L.food.searchPlaceholder} />
+      <Field value={query} onChange={setQuery} numeric={false} placeholder={L.food.searchPlaceholder} search />
+      <Row style={{ flexWrap: 'nowrap' }}>
+        <Button title={L.food.create} icon="plus" kind="secondary" onPress={() => router.push('/food-edit')} style={{ flex: 1 }} />
+        <Button title={L.food.quick} icon="flame" kind="secondary" onPress={() => router.push({ pathname: '/food-edit', params: { quick: '1', date } })} style={{ flex: 1 }} />
+      </Row>
+      {online && (
+        <Card>
+          <H icon="barcode">{L.food.barcode}</H>
+          <Row style={{ flexWrap: 'nowrap' }}>
+            <Field value={barcode} onChange={setBarcode} placeholder="4601234567890" />
+            <Button title={L.food.find} onPress={findBarcode} disabled={barcodeBusy} />
+          </Row>
+          {barcodeBusy ? <ActivityIndicator color={c.accent} /> : null}
+          {barcodeError ? <T color={c.danger} size={13}>{L.food.barcodeMissing}</T> : null}
+        </Card>
+      )}
 
-      {q ? (
+      {!ready ? (
+        <ActivityIndicator color={c.accent} style={{ marginTop: 24 }} />
+      ) : q ? (
         <Card>
           {list(results)}
           {loading ? (
@@ -183,33 +220,21 @@ export default function FoodSearch() {
         </Card>
       )}
 
-      <Row style={{ flexWrap: 'nowrap' }}>
-        <Button title={L.food.create} icon="plus" kind="secondary" onPress={() => router.push('/food-edit')} style={{ flex: 1 }} />
-        <Button title={L.food.quick} icon="flame" kind="secondary" onPress={() => router.push({ pathname: '/food-edit', params: { quick: '1', date } })} style={{ flex: 1 }} />
-      </Row>
-      <Button title={L.food.repeatYesterday} icon="copy" kind="ghost" onPress={repeatYesterday} />
-
-      {online && (
-        <Card>
-          <H icon="barcode">{L.food.barcode}</H>
-          <Row style={{ flexWrap: 'nowrap' }}>
-            <Field value={barcode} onChange={setBarcode} placeholder="4601234567890" />
-            <Button title={L.food.find} onPress={findBarcode} disabled={barcodeBusy} />
-          </Row>
-          {barcodeBusy ? <ActivityIndicator color={c.accent} /> : null}
-          {barcodeError ? <T color={c.danger} size={13}>{L.food.barcodeMissing}</T> : null}
-        </Card>
-      )}
 
       <AmountSheet
         food={selected}
         onClose={() => setSelected(null)}
-        onSubmit={(grams) => {
-          // Keep online foods locally so they work offline and show up in "My foods".
-          if (selected!.source === 'off' || selected!.source === 'usda') saveFood(selected!);
-          logFood(selected!, grams, defaultMeal(), date);
+        onSubmit={(grams, pieces) => {
+          const food = selected!;
           setSelected(null);
           router.back();
+          // Write after the back transition has started, so re-rendering the Food section
+          // does not stall the animation.
+          setTimeout(() => {
+            // Keep online foods locally so they work offline and show up in "My foods".
+            if (food.source === 'off' || food.source === 'usda') saveFood(food);
+            logFood(food, grams, defaultMeal(), date, pieces);
+          }, 350);
         }}
       />
     </Screen>

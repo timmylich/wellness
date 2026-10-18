@@ -1,0 +1,17 @@
+<p>Wellness is a free, open-source health tracker that keeps every byte of your data on your phone. No ads, no accounts, no analytics, no Google services.</p>
+
+<p><b>Food</b> — 12 daily scales (calories, protein, fat, carbs, sugar, added sugar, sodium, fibre, saturated and trans fat, cholesterol, potassium) with personal minimum, target and maximum based on your profile, goal pace and activity. Offline food database, Open Food Facts and USDA search, barcodes, counting by pieces, custom foods, energy balance and advice.</p>
+
+<p><b>Water</b> — one tap for water, a separate button for other drinks, charts, the recommended range and a clearly marked dangerous amount.</p>
+
+<p><b>Activity</b> — background step counting from the phone's hardware sensor or Health Connect, workout templates with calorie estimates.</p>
+
+<p><b>Heart</b> — blood pressure and pulse log with ACC/AHA classification and heart-rate zones.</p>
+
+<p><b>Body</b> — weight trend with a time-weighted average, body fat estimates, BMI, waist-to-height ratio, healthy weight range.</p>
+
+<p><b>Pantry</b> (optional) — products at home with expiry dates, a freshness bar, how much is left, nutrition tags and a reminder before a product expires.</p>
+
+<p><b>Tips</b> — fresh air, drinking water, cancer prevention, sun, back health, sleep and nutrition, with sources.</p>
+
+<p>Optional network access: food search (Open Food Facts, USDA). Wellness is not a medical device.</p>

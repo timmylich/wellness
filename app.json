@@ -3,13 +3,13 @@
     "name": "Wellness",
     "slug": "wellness",
     "scheme": "wellness",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "io.github.timmylich.wellness",
-      "versionCode": 4,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#2E9E6A",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -24,8 +24,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
-      "predictiveBackGestureEnabled": false,
-      "googleServicesFile": "./google-services.json"
+      "predictiveBackGestureEnabled": false
     },
     "ios": {
       "supportsTablet": true,
@@ -46,7 +45,9 @@
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 26
+            "minSdkVersion": 26,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
           }
         }
       ],
@@ -63,8 +64,13 @@
           }
         }
       ],
-      "@react-native-firebase/app",
-      "@react-native-firebase/messaging"
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Wellness uses the camera to attach photos of medical reports to your health records.",
+          "photosPermission": "Wellness attaches photos of medical reports to your health records."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

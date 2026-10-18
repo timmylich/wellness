@@ -2,6 +2,8 @@
 import { todayKey } from '../lib/date';
 import { setState, uid } from './store';
 import type {
+  PantryItem,
+  HealthRecord,
   AppData,
   BodyEntry,
   Food,
@@ -15,7 +17,7 @@ import type {
   WorkoutTemplate,
 } from './types';
 
-type ListKey = 'foodLog' | 'water' | 'workouts' | 'heart' | 'body';
+type ListKey = 'foodLog' | 'water' | 'workouts' | 'heart' | 'body' | 'pantry' | 'health';
 
 function removeFrom(key: ListKey, id: string) {
   setState((s) => ({ ...s, [key]: (s[key] as { id: string }[]).filter((e) => e.id !== id) }));
@@ -51,8 +53,9 @@ export function setStepCounter(stepCounter: AppData['meta']['stepCounter']) {
   setState((s) => ({ ...s, meta: { ...s.meta, stepCounter } }));
 }
 
-export function setPushToken(pushToken: string) {
-  setState((s) => (s.meta.pushToken === pushToken ? s : { ...s, meta: { ...s.meta, pushToken } }));
+
+export function updateMeta(patch: Partial<AppData['meta']>) {
+  setState((s) => ({ ...s, meta: { ...s.meta, ...patch } }));
 }
 
 export function resetDonationPrompts() {
@@ -61,8 +64,8 @@ export function resetDonationPrompts() {
 
 // ---- nutrition ---------------------------------------------------------------
 
-export function logFood(food: Food, grams: number, meal: MealType, date = todayKey()) {
-  const entry: FoodEntry = { id: uid(), date, time: Date.now(), meal, food, grams };
+export function logFood(food: Food, grams: number, meal: MealType, date = todayKey(), pieces?: number) {
+  const entry: FoodEntry = { id: uid(), date, time: Date.now(), meal, food, grams, pieces: pieces && pieces > 1 ? pieces : undefined };
   setState((s) => ({ ...s, foodLog: [...s.foodLog, entry] }));
 }
 
@@ -184,6 +187,32 @@ export function addBody(e: Omit<BodyEntry, 'id' | 'time' | 'date'>) {
 }
 
 export const removeBody = (id: string) => removeFrom('body', id);
+
+// ---- pantry ------------------------------------------------------------------------
+
+export function savePantryItem(item: PantryItem) {
+  setState((s) => ({
+    ...s,
+    pantry: s.pantry.some((p) => p.id === item.id) ? s.pantry.map((p) => (p.id === item.id ? item : p)) : [...s.pantry, item],
+  }));
+}
+
+export function setPantryLeft(id: string, left: number) {
+  setState((s) => ({ ...s, pantry: s.pantry.map((p) => (p.id === id ? { ...p, left } : p)) }));
+}
+
+export const removePantryItem = (id: string) => removeFrom('pantry', id);
+
+// ---- health records ---------------------------------------------------------------
+
+export function saveHealthRecord(r: HealthRecord) {
+  setState((s) => ({
+    ...s,
+    health: s.health.some((x) => x.id === r.id) ? s.health.map((x) => (x.id === r.id ? r : x)) : [...s.health, r],
+  }));
+}
+
+export const removeHealthRecord = (id: string) => removeFrom('health', id);
 
 // ---- data ------------------------------------------------------------------------
 

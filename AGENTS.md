@@ -45,5 +45,5 @@ Docs: https://docs.expo.dev/eas/index.md
 - Code comments, commits and docs in English. UI strings only via `src/i18n` (ru + en, same keys); use `const L = useT()`.
 - Health formulas and limits live in `src/lib/calc.ts` and must cite a source; add a unit test in `src/lib/__tests__`.
 - All persisted state is `AppData` (`src/store/types.ts`); mutate only through `src/store/actions.ts`.
-- No analytics, ads or trackers. Network access is limited to the optional Open Food Facts search.
+- No analytics, ads or trackers, no Google Play services/Firebase (F-Droid compatible). Network access is limited to the optional food search (Open Food Facts, USDA) and the optional GitHub Releases update check.
 - Run `npm run check` (typecheck + lint + tests) before declaring a task done.

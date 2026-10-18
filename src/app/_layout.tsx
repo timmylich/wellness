@@ -8,28 +8,26 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { DialogHost } from '../components/Dialog';
 import { DonationPrompt } from '../components/DonationPrompt';
+import { useT } from '../i18n';
 import { useMotion } from '../lib/motion';
-import { firebaseProvider } from '../lib/firebaseMessaging';
-import { initNotifications, setNotificationProvider } from '../lib/notifications';
 import { useTheme } from '../lib/theme';
+import { maybeCheckForUpdate } from '../lib/updates';
 import { useStepTracking } from '../lib/useStepCounter';
 import { hydrate, useHydrated, useStore } from '../store/store';
-
-// Push notifications go through Firebase Cloud Messaging (opt-in, see Settings → Notifications).
-setNotificationProvider(firebaseProvider);
 
 // Keep the native splash (logo) until stored data is loaded, instead of flashing a placeholder.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const c = useTheme();
+  const L = useT();
   const motion = useMotion();
   const ready = useHydrated();
   const onboarded = useStore((s) => s.meta.onboarded);
   const stepsEnabled = useStore((s) => s.settings.sections.activity);
   const stepsSource = useStore((s) => s.settings.stepsSource);
-  const notificationsOn = useStore((s) => s.settings.notifications.enabled);
 
   useEffect(() => {
     hydrate();
@@ -37,8 +35,12 @@ export default function RootLayout() {
   useEffect(() => {
     if (ready) SplashScreen.hide();
   }, [ready]);
-  useEffect(() => (ready ? initNotifications() : undefined), [ready, notificationsOn]);
   useStepTracking(ready && onboarded && stepsEnabled, stepsSource);
+  useEffect(() => {
+    if (ready) maybeCheckForUpdate((v) => ({ title: L.settings.updateTitle, body: L.settings.updateBody(v) }));
+    // Once per launch; the check itself is rate-limited to once a day.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   if (!ready) return null;
 
@@ -59,6 +61,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack>
       <DonationPrompt />
+      <DialogHost okText={L.common.done} />
     </SafeAreaProvider>
   );
 }

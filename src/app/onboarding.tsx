@@ -21,6 +21,7 @@ export default function Onboarding() {
   const L = useT();
   const saved = useStore((s) => s.profile);
   const sections = useStore((s) => s.settings.sections);
+  const settings = useStore((s) => s.settings);
   const language = useStore((s) => s.settings.language);
   const [step, setStep] = useState(0);
   // Text fields are kept as strings so the user can type freely.
@@ -135,6 +136,14 @@ export default function Onboarding() {
           {(Object.keys(L.sectionsLong) as SectionId[]).map((id) => (
             <Toggle key={id} label={L.sectionsLong[id]} value={sections[id]} onChange={(v) => updateSettings({ sections: { ...sections, [id]: v } })} />
           ))}
+          <T bold>{L.settings.theme}</T>
+          <Segmented
+            value={settings.theme}
+            onChange={(theme) => updateSettings({ theme })}
+            options={(['system', 'light', 'dark'] as const).map((v) => ({ value: v, label: L.settings.themes[v] }))}
+          />
+          <Toggle label={L.settings.amoled} hint={L.settings.amoledHint} value={settings.amoled} onChange={(amoled) => updateSettings({ amoled })} />
+          <Toggle label={L.settings.adaptive} hint={L.settings.adaptiveHint} value={settings.adaptiveTargets} onChange={(adaptiveTargets) => updateSettings({ adaptiveTargets })} />
           <View style={{ backgroundColor: c.accentSoft, borderRadius: 12, padding: 12, gap: 4 }}>
             <T bold>{L.onboarding.yourNorm}</T>
             {(() => {

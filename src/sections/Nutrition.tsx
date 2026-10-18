@@ -3,13 +3,15 @@
  * "Add food" button and a flat, time-ordered log for the day.
  */
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, ScrollView, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import { AmountSheet } from '../components/AmountSheet';
 import { NutrientSheet } from '../components/NutrientSheet';
 import { usePagerLockHandlers } from '../components/PagerLock';
 import { BarChart, LineChart, RangeBar, Ring } from '../components/charts';
+import { NestedScrollHost } from '../../modules/wellness-native';
+import { Appear } from '../components/Appear';
 import { DateNav } from '../components/DateNav';
 import { Button, Card, Chip, Empty, fmt, Hint, ListItem, Row, Segmented, Stat, T, Tap } from '../components/ui';
 import { useT, type Dict } from '../i18n';
@@ -27,7 +29,7 @@ import {
 } from '../lib/calc';
 import { lastDays, shortLabel, timeLabel, todayKey } from '../lib/date';
 import { useDaySummary } from '../lib/hooks';
-import { animateLayout } from '../lib/motion';
+import { animateLayout, useMotion } from '../lib/motion';
 import { alpha, toneColor, useTheme } from '../lib/theme';
 import { removeFoodEntry, updateFoodEntry } from '../store/actions';
 import { getState, useStore } from '../store/store';
@@ -38,7 +40,7 @@ function unitOf(k: NutrientKey, L: Dict) {
 }
 
 /** One nutrient line: label, value/target, gauge; tap opens the details sheet. */
-function NutrientRow({ k, value, range, onOpen }: { k: NutrientKey; value: number; range: Range; onOpen: (k: NutrientKey) => void }) {
+const NutrientRow = memo(function NutrientRow({ k, value, range, onOpen }: { k: NutrientKey; value: number; range: Range; onOpen: (k: NutrientKey) => void }) {
   const c = useTheme();
   const L = useT();
   const status = rangeStatus(value, range);
@@ -49,26 +51,24 @@ function NutrientRow({ k, value, range, onOpen }: { k: NutrientKey; value: numbe
         <T>{L.nutrients[k].label}</T>
         <T>
           <T bold color={toneColor(c, status === 'high' ? 'danger' : status === 'low' ? 'low' : 'ok')}>{fmt(value, value < 10 && value % 1 ? 1 : 0)}</T>
-          <T dim size={13}> / {fmt(range.target)} {u}</T>
+          <T dim size={13}> / {range.lowerIsBetter ? `≤ ${fmt(range.max)}` : fmt(range.target)} {u}</T>
         </T>
       </Row>
       <RangeBar value={value} range={range} height={8} />
     </Tap>
   );
-}
+});
 
 export function Nutrition() {
   const c = useTheme();
   const L = useT();
   const { height: winH } = useWindowDimensions();
-  const [date, setDate] = useState(todayKey());
+  const [navDate, setDate] = useState(todayKey());
+  // The date label animates immediately; the heavy day data follows a frame later.
+  const date = useDeferredValue(navDate);
   const [editing, setEditing] = useState<FoodEntry | null>(null);
-  const [detail, setDetail] = useState<NutrientKey | null>(null);
   const lockHandlers = usePagerLockHandlers();
-  const [page, setPage] = useState(0);
-  const [pageW, setPageW] = useState(0);
-  const [pageHeights, setPageHeights] = useState<number[]>([]);
-  const [scrollX] = useState(() => new Animated.Value(0));
+  const [detail, setDetail] = useState<NutrientKey | null>(null);
   const [period, setPeriod] = useState<7 | 30>(7);
   const [chartKey, setChartKey] = useState<NutrientKey>('kcal');
   const adaptive = useStore((s) => s.settings.adaptiveTargets);
@@ -81,7 +81,8 @@ export function Nutrition() {
   const correction = useMemo(() => adaptiveCorrection(getState(), date), [date, foodLog, adaptive]);
   const trend = useMemo(() => {
     const data = getState();
-    return lastDays(period, date).map((d) => {
+    // Trend charts always end today: they show history, not the selected day.
+    return lastDays(period, todayKey()).map((d) => {
       const day = data.foodLog.filter((e) => e.date === d);
       return { d, n: sumEntries(day), logged: day.length > 0, exp: expenditureFor(data, d), target: targetsFor(data, d)[chartKey] };
     });
@@ -163,11 +164,13 @@ export function Nutrition() {
       body: (
         <>
           <Segmented value={period} onChange={setPeriod} options={[{ value: 7, label: L.common.days7 }, { value: 30, label: L.common.days30 }]} />
+          <NestedScrollHost mode="horizontal" {...lockHandlers}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ gap: 6 }}>
             {NUTRIENT_KEYS.map((k) => (
               <Chip key={k} label={L.nutrients[k].short} active={chartKey === k} onPress={() => setChartKey(k)} />
             ))}
           </ScrollView>
+          </NestedScrollHost>
           <BarChart
             data={trend.map((x) => ({
               label: shortLabel(x.d),
@@ -175,7 +178,7 @@ export function Nutrition() {
               color: rangeStatus(x.n[chartKey], x.target) === 'high' ? c.danger : x.logged ? c.accent : c.border,
             }))}
             bands={[{ from: lastTarget.lowerIsBetter ? 0 : lastTarget.min, to: lastTarget.max, color: alpha(c.ok, 0.12) }]}
-            target={lastTarget.target}
+            target={lastTarget.lowerIsBetter ? undefined : lastTarget.target}
             height={130}
           />
           <T size={12} dim>{L.nutrition.periodBalance(logged.length, periodBalance, Math.abs(periodBalance) / KCAL_PER_KG_FAT)}</T>
@@ -184,83 +187,19 @@ export function Nutrition() {
     },
   ];
 
-  const maxH = winH * 0.5;
-  // Card height interpolates between the measured heights of neighbouring pages while swiping,
-  // so short pages don't leave empty space and transitions stay smooth.
-  const heightAnim =
-    pageW > 0 && pageHeights.length === pages.length && pageHeights.every(Boolean)
-      ? scrollX.interpolate({
-          inputRange: pages.map((_, i) => i * pageW),
-          outputRange: pageHeights.map((h) => Math.min(h, maxH)),
-          extrapolate: 'clamp',
-        })
-      : undefined;
 
   return (
     <>
-      <DateNav date={date} onChange={setDate} />
+      <DateNav date={navDate} onChange={setDate} />
 
-      <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
-        <View onLayout={(e) => setPageW(e.nativeEvent.layout.width)} {...lockHandlers}>
-          <Animated.ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
-            scrollEventThrottle={16}
-            onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
-              useNativeDriver: false,
-              listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-                if (!pageW) return;
-                const p = Math.round(e.nativeEvent.contentOffset.x / pageW);
-                if (p !== page) setPage(p);
-              },
-            })}
-            style={{ height: heightAnim ?? maxH }}
-            contentContainerStyle={{ alignItems: 'flex-start' }}
-          >
-            {pageW > 0 &&
-              pages.map((p, idx) => (
-                <ScrollView
-                  key={p.title}
-                  style={{ width: pageW, height: pageHeights[idx] ? Math.min(pageHeights[idx], maxH) : undefined }}
-                  nestedScrollEnabled
-                  showsVerticalScrollIndicator={false}
-                >
-                  <View
-                    style={{ padding: 16, gap: 8 }}
-                    onLayout={(e) => {
-                      const h = Math.ceil(e.nativeEvent.layout.height);
-                      setPageHeights((prev) => (prev[idx] === h ? prev : Object.assign([...prev], { [idx]: h })));
-                    }}
-                  >
-                    <T size={17} bold>{p.title}</T>
-                    {p.body}
-                  </View>
-                </ScrollView>
-              ))}
-          </Animated.ScrollView>
-        </View>
-        <Row gap={6} style={{ justifyContent: 'center', paddingVertical: 10 }}>
-          {pages.map((p, i) => (
-            <Animated.View
-              key={p.title}
-              style={{
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: c.accent,
-                width: pageW ? scrollX.interpolate({ inputRange: [(i - 1) * pageW, i * pageW, (i + 1) * pageW], outputRange: [6, 20, 6], extrapolate: 'clamp' }) : 6,
-                opacity: pageW ? scrollX.interpolate({ inputRange: [(i - 1) * pageW, i * pageW, (i + 1) * pageW], outputRange: [0.3, 1, 0.3], extrapolate: 'clamp' }) : 0.3,
-              }}
-            />
-          ))}
-        </Row>
-      </Card>
+      <StatCarousel pages={pages} maxH={winH * 0.5} />
 
       <Button title={L.nutrition.addFood} icon="plus" big onPress={() => router.push({ pathname: '/food-search', params: { date } })} />
 
       <Card>
         <T size={17} bold>{L.nutrition.log}</T>
+        {/* Re-keyed per day: switching days replays the entrance animation. */}
+        <Appear key={date}>
         {sorted.length ? (
           sorted.map((e) => {
             const n = entryNutrients(e);
@@ -268,7 +207,7 @@ export function Nutrition() {
               <ListItem
                 key={e.id}
                 title={e.food.name}
-                subtitle={`${timeLabel(e.time)} · ${fmt(e.grams)} ${L.units.g} · ${L.nutrients.protein.short} ${fmt(n.protein)} ${L.nutrients.fat.short} ${fmt(n.fat)} ${L.nutrients.carbs.short} ${fmt(n.carbs)}`}
+                subtitle={`${timeLabel(e.time)} · ${e.pieces ? `${e.pieces} × ${fmt(e.grams / e.pieces)}` : fmt(e.grams)} ${L.units.g} · ${L.nutrients.protein.short} ${fmt(n.protein)} ${L.nutrients.fat.short} ${fmt(n.fat)} ${L.nutrients.carbs.short} ${fmt(n.carbs)}`}
                 right={<T bold>{fmt(n.kcal)}</T>}
                 onPress={() => setEditing(e)}
                 onDelete={() => removeFoodEntry(e.id)}
@@ -278,6 +217,7 @@ export function Nutrition() {
         ) : (
           <Empty text={L.nutrition.emptyLog} />
         )}
+        </Appear>
         {sorted.length ? <T dim size={12}>{L.common.longPressDelete}</T> : null}
       </Card>
 
@@ -292,10 +232,16 @@ export function Nutrition() {
       <AmountSheet
         food={editing?.food ?? null}
         initialGrams={editing?.grams}
+        initialPieces={editing?.pieces}
         submitLabel={L.common.save}
         onClose={() => setEditing(null)}
-        onSubmit={(grams) => {
-          if (editing) updateFoodEntry(editing.id, { grams });
+        onEditData={() => {
+          const id = editing?.id;
+          setEditing(null);
+          if (id) setTimeout(() => router.push({ pathname: '/food-edit', params: { entry: id } }), 50);
+        }}
+        onSubmit={(grams, pieces) => {
+          if (editing) updateFoodEntry(editing.id, { grams, pieces: pieces > 1 ? pieces : undefined });
           setEditing(null);
         }}
         onDelete={() => {
@@ -307,5 +253,133 @@ export function Nutrition() {
         }}
       />
     </>
+  );
+}
+
+/**
+ * Swipeable stat cards. Kept in its own component so measuring page heights (e.g. while a hint
+ * inside expands) re-renders only the carousel, not the whole Food section. The card springs to
+ * the height of the page being shown; height changes within the same page follow instantly.
+ */
+const DOT = 7;
+const DOT_GAP = 9;
+const DOT_ACTIVE = 18;
+/** Fraction of the card width, or fling speed, that is enough to change the card. */
+const SWIPE_FRACTION = 0.12;
+const SWIPE_VELOCITY = 0.15;
+
+function StatCarousel({ pages, maxH }: { pages: { title: string; body: React.ReactNode }[]; maxH: number }) {
+  const scrollRef = useRef<ScrollView>(null);
+  // Page where the current drag started (closure state: read in scroll callbacks only).
+  const [dragStart] = useState(() => {
+    let page = 0;
+    return { set: (p: number) => (page = p), get: () => page };
+  });
+  const c = useTheme();
+  const lockHandlers = usePagerLockHandlers();
+  const [page, setPage] = useState(0);
+  const [pageW, setPageW] = useState(0);
+  const [pageHeights, setPageHeights] = useState<number[]>([]);
+  const [scrollX] = useState(() => new Animated.Value(0));
+  // Card height: jumps to the first measured height, springs afterwards.
+  const [card] = useState(() => {
+    const height = new Animated.Value(0);
+    let ready = false;
+    let current = 0;
+    return {
+      height,
+      to(h: number, animate: boolean, page: number) {
+        // Spring only when switching pages; growth inside a page (a hint opening) follows it.
+        const switched = page !== current;
+        current = page;
+        if (!ready || !animate || !switched) height.setValue(h);
+        else Animated.spring(height, { toValue: h, useNativeDriver: false, speed: 18, bounciness: 2 }).start();
+        ready = true;
+      },
+    };
+  });
+  const motion = useMotion();
+  // The card springs to the height of the page being shown (decided at the swipe midpoint).
+  // One animation instead of tracking every scroll event, so content below never lags behind
+  // and jumps at the end of a fast swipe.
+  const targetH = pageHeights[page] ?? null;
+  const [shownH, setShownH] = useState<number | null>(null);
+  if (targetH != null && targetH !== shownH) setShownH(targetH);
+  useEffect(() => {
+    if (shownH != null) card.to(shownH, motion, page);
+  }, [shownH, motion, card, page]);
+
+  return (
+      <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
+        <NestedScrollHost mode="horizontal" onLayout={(e) => setPageW(e.nativeEvent.layout.width)} {...lockHandlers}>
+          <Animated.ScrollView
+            ref={scrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            // Own snapping: a short, light swipe is enough to change the card.
+            onScrollBeginDrag={(e) => {
+              dragStart.set(pageW ? Math.round(e.nativeEvent.contentOffset.x / pageW) : 0);
+            }}
+            onScrollEndDrag={(e) => {
+              if (!pageW) return;
+              const start = dragStart.get();
+              const dx = e.nativeEvent.contentOffset.x - start * pageW;
+              const vx = -(e.nativeEvent.velocity?.x ?? 0);
+              let to = start;
+              if (dx > pageW * SWIPE_FRACTION || vx > SWIPE_VELOCITY) to += 1;
+              else if (dx < -pageW * SWIPE_FRACTION || vx < -SWIPE_VELOCITY) to -= 1;
+              to = Math.max(0, Math.min(pages.length - 1, to));
+              scrollRef.current?.scrollTo({ x: to * pageW, animated: true });
+            }}
+            scrollEventThrottle={16}
+            onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+              // Dots follow the swipe on the native thread; JS only hears about page changes.
+              useNativeDriver: true,
+              listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                if (!pageW) return;
+                const p = Math.round(e.nativeEvent.contentOffset.x / pageW);
+                if (p !== page) setPage(p);
+              },
+            })}
+            style={{ height: shownH == null ? maxH : card.height }}
+            contentContainerStyle={{ alignItems: 'flex-start' }}
+          >
+            {pageW > 0 &&
+              pages.map((p, idx) => (
+                <View key={p.title} style={{ width: pageW }}>
+                  <View
+                    style={{ padding: 16, gap: 8 }}
+                    onLayout={(e) => {
+                      const h = Math.ceil(e.nativeEvent.layout.height);
+                      setPageHeights((prev) => (prev[idx] === h ? prev : Object.assign([...prev], { [idx]: h })));
+                    }}
+                  >
+                    <T size={17} bold>{p.title}</T>
+                    {p.body}
+                  </View>
+                </View>
+              ))}
+          </Animated.ScrollView>
+        </NestedScrollHost>
+        {/* Page dots with one sliding indicator (native-driven). */}
+        <View style={{ alignSelf: 'center', flexDirection: 'row', gap: DOT_GAP, paddingVertical: 12 }}>
+          {pages.map((p) => (
+            <View key={p.title} style={{ width: DOT, height: DOT, borderRadius: DOT / 2, backgroundColor: alpha(c.accent, 0.3) }} />
+          ))}
+          <Animated.View
+            style={{
+              position: 'absolute',
+              top: 12 - 0.5,
+              left: (DOT - DOT_ACTIVE) / 2,
+              width: DOT_ACTIVE,
+              height: DOT + 1,
+              borderRadius: (DOT + 1) / 2,
+              backgroundColor: c.accent,
+              transform: [{ translateX: pageW ? Animated.multiply(scrollX, (DOT + DOT_GAP) / pageW) : 0 }],
+            }}
+          />
+        </View>
+      </Card>
   );
 }

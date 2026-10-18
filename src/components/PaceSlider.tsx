@@ -2,6 +2,7 @@
  * Weekly weight-change slider: left = lose, centre = maintain, right = gain.
  * Warning zones are coloured relative to the user's body weight.
  */
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import { useT } from '../i18n';
@@ -14,10 +15,14 @@ import { fmt, Hint, Row, T } from './ui';
 export function PaceSlider({ profile, onChange }: { profile: Profile; onChange: (v: number) => void }) {
   const c = useTheme();
   const L = useT();
-  const v = profile.weeklyChangeKg;
-  const delta = goalDelta(profile);
-  const warning = paceWarning(profile);
-  const weeks = weeksToTarget(profile);
+  // The value is local while dragging and committed to the store once on release:
+  // writing the store on every step re-rendered the whole app and lagged.
+  const [draft, setDraft] = useState<number | null>(null);
+  const v = draft ?? profile.weeklyChangeKg;
+  const p = { ...profile, weeklyChangeKg: v };
+  const delta = goalDelta(p);
+  const warning = paceWarning(p);
+  const weeks = weeksToTarget(p);
   const diff = profile.targetWeightKg - profile.weightKg;
   const mismatch = v !== 0 && Math.abs(diff) >= 0.3 && Math.sign(diff) !== Math.sign(v);
   // Loss faster than 1 % / 1.25 % of body weight per week is flagged.
@@ -34,7 +39,11 @@ export function PaceSlider({ profile, onChange }: { profile: Profile; onChange: 
         min={PACE_MIN}
         max={PACE_MAX}
         step={0.05}
-        onChange={onChange}
+        onChange={setDraft}
+        onComplete={(x) => {
+          setDraft(null);
+          if (x !== profile.weeklyChangeKg) onChange(x);
+        }}
         marks={[0]}
         zones={[
           { from: PACE_MIN, to: Math.max(PACE_MIN, dangerLoss), color: alpha(c.danger, 0.55) },

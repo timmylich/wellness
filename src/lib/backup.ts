@@ -4,20 +4,39 @@
  * Food pack format is documented in docs/food-packs.md.
  * Errors are thrown with i18n keys from `settings` (shareUnavailable, notBackup, noFoods).
  */
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 import { getState, normalize, replaceState, setState } from '../store/store';
 import type { AppData, Food } from '../store/types';
 import { todayKey } from './date';
 
-export async function exportData(): Promise<void> {
-  const file = new File(Paths.cache, `wellness-backup-${todayKey()}.json`);
+/**
+ * Save a backup file into a folder the user picks (Storage Access Framework). Returns the file
+ * name, or null if the user cancelled. Falls back to the share sheet if folder picking fails.
+ */
+export async function exportData(): Promise<string | null> {
+  const name = `wellness-backup-${todayKey()}.json`;
+  const json = JSON.stringify(getState(), null, 2);
+  let dir: Directory | null = null;
+  try {
+    dir = await Directory.pickDirectoryAsync();
+  } catch (e) {
+    // Cancelling the picker rejects; anything else falls through to sharing.
+    if (String(e).toLowerCase().includes('cancel')) return null;
+  }
+  if (dir) {
+    const file = dir.createFile(name, 'application/json');
+    file.write(json);
+    return name;
+  }
+  const file = new File(Paths.cache, name);
   if (file.exists) file.delete();
   file.create();
-  file.write(JSON.stringify(getState(), null, 2));
+  file.write(json);
   if (!(await Sharing.isAvailableAsync())) throw new Error('shareUnavailable');
   await Sharing.shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Wellness backup' });
+  return name;
 }
 
 /** Opens the system picker and returns parsed JSON, or null if the user cancelled. */

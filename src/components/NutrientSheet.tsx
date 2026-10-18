@@ -58,15 +58,25 @@ export function NutrientSheet({
                 <T size={20} bold>{L.nutrients[k].label}</T>
                 <Row style={{ alignItems: 'flex-end' }}>
                   <T size={34} bold color={color}>{fmt(value, digits)}</T>
-                  <T dim size={15} style={{ marginBottom: 6 }}>/ {fmt(range.target)} {u}</T>
+                  <T dim size={15} style={{ marginBottom: 6 }}>/ {range.lowerIsBetter ? `≤ ${fmt(range.max)}` : fmt(range.target)} {u}</T>
                 </Row>
                 <RangeBar value={value} range={range} height={16} />
                 <Row>
                   {!range.lowerIsBetter && <Stat label={L.common.min} value={fmt(range.min)} unit={u} color={c.low} />}
-                  <Stat label={L.common.target} value={fmt(range.target)} unit={u} color={c.ok} />
-                  <Stat label={L.common.max} value={fmt(range.max)} unit={u} color={c.danger} />
+                  {range.lowerIsBetter ? (
+                    <Stat label={L.common.limit} value={`≤ ${fmt(range.max)}`} unit={u} color={c.danger} />
+                  ) : (
+                    <>
+                      <Stat label={L.common.target} value={fmt(range.target)} unit={u} color={c.ok} />
+                      <Stat label={L.common.max} value={fmt(range.max)} unit={u} color={c.danger} />
+                    </>
+                  )}
                 </Row>
-                {range.target > 0 ? <T dim size={13}>{L.nutrition.sheet.ofTarget((value / range.target) * 100)}</T> : null}
+                {range.lowerIsBetter ? (
+                  range.max > 0 ? <T dim size={13}>{L.nutrition.sheet.ofLimit((value / range.max) * 100)}</T> : null
+                ) : range.target > 0 ? (
+                  <T dim size={13}>{L.nutrition.sheet.ofTarget((value / range.target) * 100)}</T>
+                ) : null}
                 <Divider />
                 <T bold>{L.nutrition.sheet.about}</T>
                 <T size={14}>{L.nutrients[k].hint}</T>

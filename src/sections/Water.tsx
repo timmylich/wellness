@@ -117,6 +117,7 @@ export function Water() {
           target={range.target}
           // Axis ends at the recommended maximum; once values get close, it grows to value + 1 L.
           maxY={Math.ceil(Math.max(range.max, Math.max(...chart.map((x) => x.value)) + 1000) / 500) * 500}
+          format={(v) => `${fmt(v / 1000, 2)} ${L.units.l}`}
         />
         <T dim size={13}>{L.water.avg(avg / 1000)}</T>
       </Card>

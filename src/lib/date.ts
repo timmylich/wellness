@@ -45,7 +45,9 @@ export function humanDate(key: string, L: DateDict): string {
   if (key === t) return L.dates.today;
   if (key === addDays(t, -1)) return L.dates.yesterday;
   const d = parseKey(key);
-  return `${d.getDate()} ${L.dates.months[d.getMonth()]}, ${L.dates.weekdays[d.getDay()]}`;
+  // Dates a year or more away (e.g. long best-before dates) also show the year.
+  const far = Math.abs(d.getTime() - parseKey(t).getTime()) >= 365 * 86_400_000;
+  return `${d.getDate()} ${L.dates.months[d.getMonth()]}${far ? ` ${d.getFullYear()}` : ''}, ${L.dates.weekdays[d.getDay()]}`;
 }
 
 export function timeLabel(ms: number): string {

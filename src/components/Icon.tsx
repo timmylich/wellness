@@ -5,6 +5,7 @@
 import {
   Activity,
   Bed,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -16,6 +17,16 @@ import {
   Dumbbell,
   Flame,
   Footprints,
+  Camera,
+  Image as ImageIcon,
+  Stethoscope,
+  Globe,
+  Send,
+  Package,
+  ShoppingBasket,
+  Settings,
+  Smartphone,
+  Download,
   HandHeart,
   HeartPulse,
   Info,
@@ -57,6 +68,8 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
+import { useTheme } from '../lib/theme';
+
 const ICONS = {
   overview: LayoutDashboard,
   tips: Lightbulb,
@@ -87,6 +100,7 @@ const ICONS = {
   trash: Trash2,
   edit: Pencil,
   copy: Copy,
+  check: Check,
   refresh: RefreshCw,
   flame: Flame,
   pulse: Activity,
@@ -99,6 +113,16 @@ const ICONS = {
   database: Database,
   donate: HandHeart,
   code: Code,
+  camera: Camera,
+  image: ImageIcon,
+  health: Stethoscope,
+  globe: Globe,
+  send: Send,
+  pantry: ShoppingBasket,
+  package: Package,
+  settings: Settings,
+  phone: Smartphone,
+  download: Download,
   // Tip categories
   air: Wind,
   cancer: Ribbon,
@@ -116,14 +140,16 @@ export type IconName = keyof typeof ICONS;
  * icon, so nothing gets clipped to the icon's square bounds.
  */
 function Glow({ size, color }: { size: number; color: string }) {
+  // A dark halo on a light background reads as a smudge; keep it subtle there.
+  const k = useTheme().dark ? 1 : 0.45;
   const g = size * 2;
   const [id] = useState(() => `glow${Math.random().toString(36).slice(2, 8)}`);
   return (
     <Svg width={g} height={g} style={{ position: 'absolute', left: -size / 2, top: -size / 2 }} pointerEvents="none">
       <Defs>
         <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-          <Stop offset="0" stopColor={color} stopOpacity={0.35} />
-          <Stop offset="0.55" stopColor={color} stopOpacity={0.12} />
+          <Stop offset="0" stopColor={color} stopOpacity={0.35 * k} />
+          <Stop offset="0.55" stopColor={color} stopOpacity={0.12 * k} />
           <Stop offset="1" stopColor={color} stopOpacity={0} />
         </RadialGradient>
       </Defs>

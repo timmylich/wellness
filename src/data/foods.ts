@@ -6,7 +6,6 @@
  * Contributing: append rows to `ROWS`. Column order is documented in `Row`.
  */
 import type { Food } from '../store/types';
-import ciqual from './ciqual.json';
 
 /** [id, nameRu, nameEn, kcal, protein, fat, carbs, sugar, addedSugar, sodium mg, fiber, satFat, transFat, cholesterol mg, potassium mg, serving g] */
 type Row = [string, string, string, number, number, number, number, number, number, number, number, number, number, number, number, number];
@@ -18,6 +17,18 @@ const ROWS: Row[] = [
   ['oat-water', 'Овсянка на воде', 'Oatmeal with water', 71, 2.5, 1.5, 12, 0.3, 0, 5, 1.7, 0.3, 0, 0, 70, 250],
   ['oat-dry', 'Овсяные хлопья (сухие)', 'Rolled oats (dry)', 366, 12.3, 6.2, 61.8, 1, 0, 6, 10, 1.1, 0, 0, 362, 50],
   ['pasta', 'Макароны варёные', 'Pasta, boiled', 131, 5, 1.1, 25, 0.6, 0, 1, 1.8, 0.2, 0, 0, 44, 200],
+  // USDA FDC: cooked (boiled, unsalted) values.
+  ['spaghetti-boiled', 'Спагетти варёные', 'Spaghetti, boiled', 158, 5.8, 0.9, 30.9, 0.6, 0, 1, 1.8, 0.2, 0, 0, 44, 200],
+  ['spaghetti-wholegrain', 'Спагетти цельнозерновые варёные', 'Whole-wheat spaghetti, boiled', 149, 6, 1.7, 30, 0.8, 0, 4, 3.9, 0.3, 0, 0, 96, 200],
+  ['noodles-egg', 'Лапша яичная варёная', 'Egg noodles, boiled', 138, 4.5, 2.1, 25, 0.4, 0, 5, 1.2, 0.4, 0, 29, 38, 200],
+  ['rice-brown', 'Рис бурый варёный', 'Brown rice, boiled', 123, 2.7, 1, 25.6, 0.2, 0, 4, 1.6, 0.3, 0, 0, 86, 200],
+  ['rice-parboiled', 'Рис пропаренный варёный', 'Parboiled rice, boiled', 123, 2.9, 0.4, 26, 0.1, 0, 2, 0.9, 0.1, 0, 0, 56, 200],
+  ['couscous', 'Кускус варёный', 'Couscous, cooked', 112, 3.8, 0.2, 23.2, 0.1, 0, 5, 1.4, 0, 0, 0, 58, 200],
+  ['quinoa', 'Киноа варёная', 'Quinoa, cooked', 120, 4.4, 1.9, 21.3, 0.9, 0, 7, 2.8, 0.2, 0, 0, 172, 200],
+  ['beans-boiled', 'Фасоль варёная', 'Kidney beans, boiled', 127, 8.7, 0.5, 22.8, 0.3, 0, 2, 6.4, 0.1, 0, 0, 405, 150],
+  ['peas-boiled', 'Горох варёный', 'Split peas, boiled', 118, 8.3, 0.4, 21.1, 2.9, 0, 2, 8.3, 0.1, 0, 0, 362, 150],
+  ['egg-boiled', 'Яйцо варёное', 'Egg, hard-boiled', 155, 12.6, 10.6, 1.1, 1.1, 0, 124, 0, 3.3, 0, 373, 126, 50],
+  ['spaghetti-dry', 'Спагетти сухие', 'Spaghetti, dry', 371, 13, 1.5, 74.7, 2.7, 0, 6, 3.2, 0.3, 0, 0, 223, 80],
   ['potato-boiled', 'Картофель варёный', 'Potatoes, boiled', 82, 2, 0.4, 16.7, 0.9, 0, 5, 1.8, 0.1, 0, 0, 380, 200],
   ['potato-mash', 'Картофельное пюре (с молоком и маслом)', 'Mashed potatoes (milk & butter)', 106, 2.5, 4.2, 15, 1.4, 0, 300, 1.4, 2.5, 0.1, 10, 300, 200],
   ['fries', 'Картофель фри', 'French fries', 312, 3.4, 15, 41, 0.3, 0, 210, 3.8, 2.3, 0.1, 0, 580, 110],
@@ -255,7 +266,13 @@ const ROWS: Row[] = [
 ];
 
 /** Built-in foods named in the given language; the other language is kept as a search alias. */
+const builtinCache: Partial<Record<'ru' | 'en', Food[]>> = {};
+
 export function builtinFoods(lang: 'ru' | 'en'): Food[] {
+  return (builtinCache[lang] ??= buildBuiltin(lang));
+}
+
+function buildBuiltin(lang: 'ru' | 'en'): Food[] {
   return ROWS.map(
     ([id, nameRu, nameEn, kcal, protein, fat, carbs, sugar, addedSugar, sodium, fiber, satFat, transFat, cholesterol, potassium, servingG]) => ({
       id: `builtin-${id}`,
@@ -278,6 +295,8 @@ export function ciqualFoods(): Food[] {
   if (ciqualCache) return ciqualCache;
   type R = [number, string, number, number | null, number | null, number | null, number | null, number | null, number | null, number | null, number | null, number | null];
   const opt = (v: number | null) => (v == null ? undefined : v);
+  // Loaded on first search, not at app start (~200 KB of JSON).
+  const ciqual = require('./ciqual.json') as { rows: unknown[] };
   ciqualCache = (ciqual.rows as R[]).map(([code, name, kcal, protein, fat, carbs, sugar, fiber, satFat, cholesterol, sodium, potassium]) => ({
     id: `ciqual-${code}`,
     name,

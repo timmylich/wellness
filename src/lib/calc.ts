@@ -24,10 +24,6 @@ export function baseExpenditure(p: Profile): number {
   return Math.round(bmr(p) * p.lifestyleFactor);
 }
 
-/** Absolute minimum intake commonly advised without medical supervision. */
-export function calorieFloor(sex: Sex): number {
-  return sex === 'male' ? 1500 : 1200;
-}
 
 /** Slider limits for the weekly weight change, kg/week. */
 export const PACE_MIN = -1.5;
@@ -149,17 +145,25 @@ export function macroMinimumKcal(p: Profile): number {
   return Math.round(0.8 * w * 4 + 0.5 * w * 9 + 130 * 4);
 }
 
+/** Targets sit at least this factor above their minimum (a minimum is not a goal). */
+const MACRO_MARGIN = 1.15;
+
+/** Absolute safety floor for any calorie recommendation without medical supervision. */
+export const CALORIE_SAFETY_FLOOR = 1200;
+
 /**
- * Daily calorie range. The target sits in the middle; the band is ±10 % (at least 150 kcal).
- * The minimum never drops below what the macro minimums require or the absolute floor
- * (1200/1500 kcal), so eating at the bottom of the range is still nutritionally adequate.
+ * Daily calorie range. The target (maintenance + the chosen weekly change) sits in the middle.
+ * - Losing: the minimum is the energy that still covers the macro minimums, the maximum mirrors
+ *   it above the target. Averaging the middle gives the chosen pace.
+ * - Gaining / maintaining: the band spans maintenance → target and mirrors it (at least ±10 %).
  */
 export function dailyCalorieTarget(p: Profile, ctx: TargetContext): Range {
   const tdee = baseExpenditure(p) + ctx.activityKcal;
-  const floor = Math.max(calorieFloor(p.sex), macroMinimumKcal(p));
+  const floor = Math.max(CALORIE_SAFETY_FLOOR, macroMinimumKcal(p));
   const target = Math.round(Math.max(floor, tdee + goalDelta(p) + ctx.adaptiveKcal));
-  const margin = Math.max(150, Math.round(target * 0.1));
-  return { min: Math.max(floor, target - margin), target, max: target + margin };
+  const losing = target < tdee - 50;
+  const half = Math.max(150, Math.round(target * 0.1), losing ? target - floor : Math.abs(target - tdee));
+  return { min: Math.max(floor, target - half), target, max: target + half };
 }
 
 /**
@@ -183,18 +187,22 @@ export function computeTargets(
     target: Math.round((losing ? 1.6 : 1.4) * w),
     max: Math.round(2.5 * w),
   };
-  // Fat: 20–35 % of energy (IOM AMDR), never below ~0.5 g/kg for hormones.
+  // Fat: 20–35 % of energy (IOM AMDR), never below ~0.5 g/kg for hormones. A target is
+  // never the bare minimum: at low energy budgets it stays a margin (MACRO_MARGIN) above it.
+  const fatMin = Math.max(0.5 * w, (kcal * 0.2) / 9);
+  const fatTarget = Math.max((kcal * 0.28) / 9, fatMin * MACRO_MARGIN);
   const fat: Range = {
-    min: Math.round(Math.max(0.5 * w, (kcal * 0.2) / 9)),
-    target: Math.round((kcal * 0.28) / 9),
-    max: Math.round((kcal * 0.35) / 9),
+    min: Math.round(fatMin),
+    target: Math.round(fatTarget),
+    max: Math.round(Math.max((kcal * 0.35) / 9, fatTarget * MACRO_MARGIN)),
   };
-  // Carbs: RDA 130 g (brain glucose), rest of energy, cap at 65 %.
-  const carbTarget = Math.max(130, (kcal - protein.target * 4 - fat.target * 9) / 4);
+  // Carbs: RDA 130 g (brain glucose) is the minimum; the target is the rest of the energy,
+  // at least a margin above the RDA; cap at 65 %.
+  const carbTarget = Math.max(130 * MACRO_MARGIN, (kcal - protein.target * 4 - fatTarget * 9) / 4);
   const carbs: Range = {
     min: 130,
     target: Math.round(carbTarget),
-    max: Math.round(Math.max(carbTarget + 20, (kcal * 0.65) / 4)),
+    max: Math.round(Math.max(carbTarget * MACRO_MARGIN, (kcal * 0.65) / 4)),
   };
 
   const ranges: Targets = {
@@ -331,6 +339,31 @@ export function healthyWeight(heightCm: number, sex: Sex) {
   return { min: 18.5 * h * h, max: 24.9 * h * h, devine };
 }
 
+/** Tags derived from per-100 g composition (Pantry and product badges). */
+export type FoodTag = 'protein' | 'salty' | 'addedSugar' | 'cholesterol' | 'fat' | 'sweet' | 'fiber' | 'lowKcal';
+
+/**
+ * Per-100 g thresholds. "High" salt/fat/sugar follow the UK FSA front-of-pack criteria
+ * (salt > 1.5 g = sodium > 600 mg, fat > 17.5 g, total sugars > 22.5 g); "high fibre" (>= 6 g)
+ * and "low energy" (<= 40 kcal) follow EU Regulation 1924/2006. Protein: >= 20 % of energy
+ * (EU "high protein") and at least 10 g. Added sugar >= 5 g and cholesterol >= 100 mg are
+ * app-level "worth noticing" cut-offs.
+ */
+export function foodTags(n: Partial<Nutrients> | undefined): FoodTag[] {
+  if (!n) return [];
+  const kcal = n.kcal ?? 0;
+  const tags: FoodTag[] = [];
+  if ((n.protein ?? 0) >= 10 && kcal > 0 && ((n.protein ?? 0) * 4) / kcal >= 0.2) tags.push('protein');
+  if ((n.sodium ?? 0) > 600) tags.push('salty');
+  if ((n.addedSugar ?? 0) >= 5) tags.push('addedSugar');
+  else if ((n.sugar ?? 0) > 22.5) tags.push('sweet');
+  if ((n.cholesterol ?? 0) >= 100) tags.push('cholesterol');
+  if ((n.fat ?? 0) > 17.5) tags.push('fat');
+  if ((n.fiber ?? 0) >= 6) tags.push('fiber');
+  if (n.kcal != null && kcal <= 40) tags.push('lowKcal');
+  return tags;
+}
+
 /** US Navy circumference method body-fat estimate (Hodgdon & Beckett, 1984). */
 export function navyBodyFat(
   sex: Sex,
@@ -346,6 +379,16 @@ export function navyBodyFat(
   }
   if (!hipCm || waistCm + hipCm <= neckCm) return null;
   return 495 / (1.29579 - 0.35004 * log(waistCm + hipCm - neckCm) + 0.221 * log(heightCm)) - 450;
+}
+
+/**
+ * Rough body-fat estimate from BMI, age and sex (Deurenberg, Weststrate & Seidell, 1991,
+ * Br J Nutr 65:105–114): BF% = 1.2·BMI + 0.23·age − 10.8·sex − 5.4 (sex: 1 male, 0 female).
+ * Error is about ±4 %, and it overestimates for muscular people; used only without
+ * a measurement or circumferences.
+ */
+export function bmiBodyFat(sex: Sex, bmiValue: number, age: number): number {
+  return Math.max(3, 1.2 * bmiValue + 0.23 * age - 10.8 * (sex === 'male' ? 1 : 0) - 5.4);
 }
 
 /** Healthy body-fat bands for adults (ACE). */
@@ -387,4 +430,22 @@ export function pulseCategory(bpm: number): { key: PulseKey; tone: Tone } {
 /** Tanaka (2001) estimate of maximum heart rate. */
 export function maxHeartRate(p: Profile): number {
   return Math.round(208 - 0.7 * age(p));
+}
+
+/**
+ * Time-weighted exponential moving average of weight (the "trend weight" popularised by
+ * The Hacker's Diet, J. Walker). Each new weigh-in pulls the trend by
+ * α = 1 − 0.5^(Δdays / halfLife), so irregular weigh-ins are weighted by the time between
+ * them and daily water swings are smoothed out.
+ */
+export function weightTrend(points: { time: number; weightKg: number }[], halfLifeDays = 7): number[] {
+  const out: number[] = [];
+  points.forEach((p, i) => {
+    if (i === 0) return out.push(p.weightKg);
+    const days = Math.max(0, (p.time - points[i - 1].time) / 86_400_000);
+    // A same-day re-weigh still counts a little (as if ~2 h passed).
+    const a = 1 - Math.pow(0.5, Math.max(days, 1 / 12) / halfLifeDays);
+    out.push(out[i - 1] + a * (p.weightKg - out[i - 1]));
+  });
+  return out;
 }

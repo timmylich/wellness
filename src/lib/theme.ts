@@ -30,8 +30,18 @@ export function alpha(hex: string, a: number): string {
 export function useTheme(): Theme {
   const system = useColorScheme();
   const mode = useStore((s) => s.settings.theme);
-  const accent = useStore((s) => s.settings.accent);
+  const userAccent = useStore((s) => s.settings.accent);
+  const amoled = useStore((s) => s.settings.amoled);
   const dark = mode === 'system' ? system === 'dark' : mode === 'dark';
+  const accent = userAccent;
+  if (dark && amoled) {
+    return {
+      dark, accent,
+      bg: '#000000', card: '#0C0E0F', cardAlt: '#16191B', text: '#ECEFF1', textDim: '#8D989F',
+      border: '#1F2427', accentSoft: alpha(accent, 0.16),
+      ok: '#3CC47C', low: '#E8B341', high: '#F08C2E', danger: '#EF5350', water: '#4FA8F7',
+    };
+  }
   return dark
     ? {
         dark, accent,
@@ -41,8 +51,8 @@ export function useTheme(): Theme {
       }
     : {
         dark, accent,
-        bg: '#F3F5F4', card: '#FFFFFF', cardAlt: '#EEF1F0', text: '#1B2124', textDim: '#69757B',
-        border: '#E1E6E4', accentSoft: alpha(accent, 0.12),
+        bg: '#F4F6F5', card: '#FFFFFF', cardAlt: '#F0F3F2', text: '#1B2124', textDim: '#69757B',
+        border: '#E4E9E7', accentSoft: alpha(accent, 0.1),
         ok: '#23A15D', low: '#D19A12', high: '#E0761B', danger: '#D93636', water: '#2F8FE6',
       };
 }

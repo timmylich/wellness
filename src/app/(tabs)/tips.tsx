@@ -69,7 +69,7 @@ export default function Tips() {
               {cat.tips.map((tip) => {
                 const isOpen = open === tip.id || !!q;
                 return (
-                  <Tap key={tip.id} scaleTo={0.98} onPress={() => setOpen(isOpen ? null : tip.id)} style={{ gap: 6, paddingVertical: 6 }}>
+                  <Tap key={tip.id} scaleTo={1} onPress={() => setOpen(isOpen ? null : tip.id)} style={{ gap: 6, paddingVertical: 6 }}>
                     <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
                       <T bold color={c.accent} style={{ flex: 1 }}>{tip.title}</T>
                       <Chevron open={isOpen} color={c.accent} />

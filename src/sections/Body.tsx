@@ -5,7 +5,7 @@ import { LineChart } from '../components/charts';
 import { BodyForm } from '../components/forms';
 import { Card, Empty, fmt, H, Hint, ListItem, Row, Stat, T } from '../components/ui';
 import { useT } from '../i18n';
-import { bmi, bmiCategory, bodyFatCategory, healthyWeight, navyBodyFat, referenceWeight } from '../lib/calc';
+import { bmi, bmiBodyFat, bmiCategory, bodyFatCategory, healthyWeight, navyBodyFat, referenceWeight, weightTrend } from '../lib/calc';
 import { humanDate, shortLabel } from '../lib/date';
 import { alpha, toneColor, useTheme } from '../lib/theme';
 import { removeBody } from '../store/actions';
@@ -23,20 +23,19 @@ export function Body() {
   const neck = last('neckCm');
   const navy = waist && neck ? navyBodyFat(profile.sex, profile.heightCm, waist, neck, last('hipCm')) : null;
   const measuredFat = last('bodyFatPct');
-  const fatPct = measuredFat ?? navy ?? undefined;
-
   const b = bmi(profile.weightKg, profile.heightCm);
+  const age = new Date().getFullYear() - profile.birthYear;
+  const fatPct = measuredFat ?? navy ?? bmiBodyFat(profile.sex, b, age);
+  const fatSource = measuredFat != null ? null : navy != null ? 'navy' : 'bmi';
+
   const cat = bmiCategory(b);
   const hw = healthyWeight(profile.heightCm, profile.sex);
   const whtr = waist ? waist / profile.heightCm : null;
   const ref = referenceWeight(profile);
 
   const weights = sorted.filter((e) => e.weightKg).slice(-60);
-  // 7-point moving average smooths daily water fluctuations.
-  const smooth = weights.map((_, i) => {
-    const w = weights.slice(Math.max(0, i - 6), i + 1);
-    return w.reduce((a, e) => a + e.weightKg!, 0) / w.length;
-  });
+  // Time-weighted moving average smooths daily water fluctuations.
+  const smooth = weightTrend(weights.map((e) => ({ time: e.time, weightKg: e.weightKg! })));
   const P = L.body.logParts;
 
   return (
@@ -50,11 +49,11 @@ export function Body() {
         </Row>
         <Row>
           <Stat label={L.body.bmi} value={fmt(b, 1)} color={toneColor(c, cat.tone)} />
-          <Stat label={L.body.fat} value={fatPct ? fmt(fatPct, 1) : '—'} unit="%" />
+          <Stat label={L.body.fat} value={(fatSource === 'bmi' ? '≈' : '') + fmt(fatPct, 1)} unit="%" />
           <Stat label={L.body.whtr} value={whtr ? fmt(whtr, 2) : '—'} color={whtr ? (whtr < 0.5 ? c.ok : whtr < 0.6 ? c.high : c.danger) : undefined} />
         </Row>
         <T color={toneColor(c, cat.tone)}>{L.body.bmiLine(L.body.bmiCat[cat.key])}</T>
-        {fatPct ? <T dim size={13}>{L.body.fatLine(L.body.fatCat[bodyFatCategory(profile.sex, fatPct)], measuredFat == null && !!navy)}</T> : null}
+        <T dim size={13}>{L.body.fatLine(L.body.fatCat[bodyFatCategory(profile.sex, fatPct)], fatSource)}</T>
       </Card>
 
       <Card>

@@ -20,7 +20,8 @@ export const DEFAULT_SETTINGS: Settings = {
   animations: true,
   stepsSource: 'device',
   accent: '#2E9E6A',
-  sections: { nutrition: true, water: true, activity: true, heart: true, body: true, tips: true },
+  amoled: false,
+  sections: { nutrition: true, water: true, activity: true, heart: true, body: true, pantry: false, health: true, tips: true },
   adaptiveTargets: false,
   onlineFoodSearch: true,
   waterPresets: [150, 250, 330, 500],
@@ -31,7 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   donationPrompts: true,
   stepsInfoDismissed: false,
   usdaApiKey: '',
-  notifications: { enabled: false, waterReminders: false, weighInReminder: false },
+  notifications: { enabled: false, expiry: true, updates: true },
   nutrientOverrides: {},
 };
 
@@ -59,6 +60,8 @@ export function createDefaultData(): AppData {
     steps: {},
     heart: [],
     body: [],
+    pantry: [],
+    health: [],
   };
 }
 

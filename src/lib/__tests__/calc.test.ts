@@ -2,9 +2,11 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   bmi,
+  bmiBodyFat,
   bmr,
   bpCategory,
   computeTargets,
+  foodTags,
   dailyCalorieTarget,
   goalDelta,
   macroMinimumKcal,
@@ -17,9 +19,10 @@ import {
   stepsKcal,
   sumEntries,
   waterRange,
+  weightTrend,
 } from '../calc';
 import { isMilestone, pendingMilestone } from '../donation';
-import { fromOff } from '../foodApi';
+import { fromOff, matchScore, queryWords } from '../foodApi';
 import { en } from '../../i18n/en';
 import { ru } from '../../i18n/ru';
 import { normalize } from '../../store/store';
@@ -68,7 +71,7 @@ describe('energy', () => {
   it('never targets below the safety floor', () => {
     const r = dailyCalorieTarget({ ...man, weeklyChangeKg: -1.5 }, { activityKcal: 0, adaptiveKcal: 0 });
     expect(r.target).toBeGreaterThanOrEqual(r.min);
-    expect(r.min).toBeGreaterThanOrEqual(1500);
+    expect(r.min).toBeGreaterThanOrEqual(1200);
   });
 
   it('keeps the calorie target in the middle of the range', () => {
@@ -79,12 +82,26 @@ describe('energy', () => {
     expect(r.min).toBeGreaterThanOrEqual(macroMinimumKcal(heavy));
   });
 
+  it('spans macro minimum → mirror when losing', () => {
+    const heavy = { ...man, weightKg: 130, heightCm: 187, targetWeightKg: 90, weeklyChangeKg: -0.6, lifestyleFactor: 1.2 };
+    const r = dailyCalorieTarget(heavy, { activityKcal: 0, adaptiveKcal: 0 });
+    expect(r.min).toBe(Math.max(1200, macroMinimumKcal(heavy)));
+    expect(r.max - r.target).toBe(r.target - r.min);
+  });
+
   it('adds activity to the calorie target', () => {
     // Active lifestyle keeps the base target above the safety floor, so the delta is exact.
     const p = { ...man, lifestyleFactor: 1.45 };
     const base = dailyCalorieTarget(p, { activityKcal: 0, adaptiveKcal: 0 }).target;
     const active = dailyCalorieTarget(p, { activityKcal: 300, adaptiveKcal: 0 }).target;
     expect(active - base).toBe(300);
+  });
+
+  it('smooths weight with a time-weighted average', () => {
+    const day = 86_400_000;
+    const t = weightTrend([{ time: 0, weightKg: 100 }, { time: 7 * day, weightKg: 98 }]);
+    expect(t[0]).toBe(100);
+    expect(t[1]).toBeCloseTo(99, 5); // one half-life → halfway
   });
 
   it('counts only steps above baseline and subtracts resting MET', () => {
@@ -103,6 +120,12 @@ describe('targets', () => {
       expect(r.min).toBeLessThanOrEqual(r.target);
       expect(r.target).toBeLessThanOrEqual(r.max);
     }
+  });
+
+  it('keeps fat and carb targets above their minimums', () => {
+    const heavy = computeTargets({ ...man, weightKg: 130, heightCm: 187, targetWeightKg: 90, weeklyChangeKg: -1 }, { activityKcal: 0, adaptiveKcal: 0 });
+    expect(heavy.fat.target).toBeGreaterThan(heavy.fat.min);
+    expect(heavy.carbs.target).toBeGreaterThan(heavy.carbs.min);
   });
 
   it('follows WHO limits', () => {
@@ -144,6 +167,26 @@ describe('nutrients', () => {
   });
 });
 
+describe('food search', () => {
+  const food = (name: string) => ({ id: name, name, source: 'builtin', per100g: {} }) as never;
+  const m = (name: string, q: string) => matchScore(food(name), queryWords(q)) > 0;
+  it('needs every word, in any order, with endings and small typos', () => {
+    expect(m('Спагетти варёные', 'варёные спагетти')).toBe(true);
+    expect(m('Спагетти варёные', 'вареных спагети')).toBe(true);
+    expect(m('Спагетти сухие', 'варёные спагетти')).toBe(false);
+    expect(m('Макароны варёные', 'варёные спагетти')).toBe(false);
+  });
+});
+
+describe('food tags', () => {
+  it('tags by FSA/EU per-100 g thresholds', () => {
+    expect(foodTags({ kcal: 120, protein: 25, fat: 2 })).toEqual(['protein']);
+    expect(foodTags({ kcal: 500, sugar: 50, addedSugar: 40, fat: 30 })).toEqual(['addedSugar', 'fat']);
+    expect(foodTags({ kcal: 30, sugar: 3 })).toEqual(['lowKcal']);
+    expect(foodTags({ kcal: 250, sodium: 1200 })).toEqual(['salty']);
+  });
+});
+
 describe('body & heart', () => {
   it('computes BMI', () => {
     expect(bmi(80, 180)).toBeCloseTo(24.69, 2);
@@ -154,6 +197,11 @@ describe('body & heart', () => {
     expect(bf).toBeGreaterThan(10);
     expect(bf).toBeLessThan(25);
     expect(navyBodyFat('male', 180, 30, 38)).toBeNull();
+  });
+
+  it('estimates body fat from BMI (Deurenberg)', () => {
+    // 1.2*25 + 0.23*40 - 10.8 - 5.4 = 23
+    expect(bmiBodyFat('male', 25, 40)).toBeCloseTo(23, 5);
   });
 
   it('classifies blood pressure (ACC/AHA 2017)', () => {
@@ -175,9 +223,9 @@ describe('body & heart', () => {
 
 describe('donation milestones', () => {
   it('fires on the documented schedule', () => {
-    expect([3, 7, 14, 30, 60, 90, 180, 270].every(isMilestone)).toBe(true);
+    expect([3, 7, 14, 30, 60, 90, 120, 150].every(isMilestone)).toBe(true);
     expect(isMilestone(4)).toBe(false);
-    expect(isMilestone(120)).toBe(false);
+    expect(isMilestone(45)).toBe(false);
   });
 
   it('shows only the latest unseen milestone', () => {

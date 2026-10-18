@@ -1,0 +1,1 @@
+Step counting that works like Google Fit, Pantry section with expiry reminders, counting food by pieces, editable log entries, custom dialogs, grouped More screen, GitHub update check. No more Firebase.

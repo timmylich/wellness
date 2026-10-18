@@ -33,13 +33,24 @@ class WellnessNativeModule : Module() {
 
   private var watcher: SensorEventListener? = null
 
+  /**
+   * Prefer the wake-up variant of the step counter. On some devices (seen on Xiaomi/Qualcomm)
+   * the non-wake-up variant keeps re-delivering a stale cached value and never updates.
+   */
+  private fun stepSensor(sm: SensorManager): Sensor? =
+    sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER, true) ?: sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+
   override fun definition() = ModuleDefinition {
     Name("WellnessNative")
 
     Events("onStepCounter")
 
+    View(NestedScrollHost::class) {
+      Prop("mode") { view: NestedScrollHost, mode: String -> view.mode = mode }
+    }
+
     Function("hasStepCounter") {
-      sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) != null
+      stepSensor(sensorManager) != null
     }
 
     /** Milliseconds since boot, to detect reboots (the counter resets on reboot). */
@@ -57,7 +68,7 @@ class WellnessNativeModule : Module() {
      */
     AsyncFunction("readStepCounter") { timeoutMs: Int, promise: Promise ->
       val sm = sensorManager
-      val sensor = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+      val sensor = stepSensor(sm)
       if (sensor == null) {
         promise.resolve(null)
         return@AsyncFunction
@@ -90,7 +101,7 @@ class WellnessNativeModule : Module() {
     Function("startWatching") {
       if (watcher != null) return@Function true
       val sm = sensorManager
-      val sensor = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return@Function false
+      val sensor = stepSensor(sm) ?: return@Function false
       val listener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
           sendEvent("onStepCounter", mapOf("steps" to event.values[0].toDouble()))
@@ -103,6 +114,40 @@ class WellnessNativeModule : Module() {
         sm.flush(listener)
       }
       true
+    }
+
+    /** Start the foreground step service (see StepService) and remember to restart it on boot. */
+    Function("startStepService") { title: String, text: String ->
+      StepStore.setEnabled(context, true)
+      runCatching { StepService.start(context, title, text) }.isSuccess
+    }
+
+    Function("stopStepService") {
+      StepStore.setEnabled(context, false)
+      StepService.stop(context)
+    }
+
+    /** Steps per local day recorded by the service since the previous call; clears them. */
+    /** Opens the system settings of the step-counter notification channel (to hide it). */
+    Function("openStepNotificationSettings") {
+      context.startActivity(StepService.channelSettingsIntent(context))
+    }
+
+    Function("drainSteps") {
+      StepStore.drain(context)
+    }
+
+    /** Local notifications (see Reminders). `url` opens a link instead of the app. */
+    Function("notify") { id: Int, title: String, body: String, url: String? ->
+      Reminders.show(context, id, title, body, url)
+    }
+
+    Function("scheduleNotification") { id: Int, atMs: Double, title: String, body: String ->
+      Reminders.schedule(context, id, atMs.toLong(), title, body)
+    }
+
+    Function("cancelNotification") { id: Int ->
+      Reminders.cancel(context, id)
     }
 
     Function("stopWatching") {

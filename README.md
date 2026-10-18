@@ -6,126 +6,174 @@
 
 <p align="center">
   An open-source, offline-first health tracker for Android.<br/>
-  Nutrition · Water · Steps & workouts · Blood pressure · Body composition · Health tips
+  Food · Water · Steps &amp; workouts · Blood pressure · Body composition · Pantry · Health tips
 </p>
 
 <p align="center">
-  No ads · No accounts · No analytics · Your data never leaves your phone
+  <a href="https://github.com/timmylich/wellness/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/timmylich/wellness?color=2E9E6A&label=release"></a>
+  <a href="https://github.com/timmylich/wellness/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/timmylich/wellness/ci.yml?branch=main&label=CI"></a>
+  <a href="LICENSE"><img alt="License: AGPL v3" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
+  <img alt="Android 8+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
+  <a href="https://github.com/timmylich/wellness/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/timmylich/wellness/total?color=2E9E6A"></a>
+</p>
+
+<p align="center">
+  <b>No ads · No accounts · No analytics · No Google services · Your data stays on your phone</b>
+</p>
+
+<p align="center">
+  <a href="https://github.com/timmylich/wellness/releases/latest"><b>⬇ Download APK</b></a> ·
+  <a href="#support-the-project">❤ Support</a> ·
+  <a href="#по-русски">🇷🇺 По-русски</a>
 </p>
 
 ---
 
-> Available in English and Russian. [Описание на русском ниже](#по-русски).
+<!-- Screenshots: put PNGs into docs/screenshots/ (1080×2400 works well) and uncomment.
+<p align="center">
+  <img src="docs/screenshots/summary.png" width="200" />
+  <img src="docs/screenshots/food.png" width="200" />
+  <img src="docs/screenshots/water.png" width="200" />
+  <img src="docs/screenshots/body.png" width="200" />
+</p>
+-->
 
 ## Features
 
-- **Nutrition** — 12 daily scales (calories, protein, fat, carbs, sugar, added sugar, sodium,
-  fiber, saturated & trans fat, cholesterol, potassium). Each has a *minimum* (below it your
-  health suffers), a *target* and a *maximum* (above it the goal is unreachable or intake is
-  unsafe). Ranges are personal: computed from your profile, goal pace and today's activity.
-- **Adaptive targets** (optional) — over- or under-eating during the last 7 days gently shifts
-  the calorie target (±15 % max) to compensate.
-- **Food database without AI, but fast** — favorites, recent foods, "repeat yesterday",
-  a bundled offline database of common CIS dishes, [Open Food Facts](https://openfoodfacts.org)
-  search (great coverage of Russian/CIS products and chains such as Dodo Pizza), USDA FoodData
-  Central, an on-device cache that makes previously found foods available offline, barcode lookup,
-  custom foods, and importable **food packs**.
-- **Energy balance** — intake vs. expenditure (BMR × lifestyle + workouts + steps) with
-  surplus/deficit converted into estimated fat mass.
-- **Rule-based advice** — actionable tips when you are short on protein/fiber/potassium or over
-  on salt/added sugar/saturated fat.
-- **Water** — one big button, presets, history, charts, recommended min/max and a clearly marked
-  dangerous range (hyponatremia).
-- **Activity** — steps counted in the background by the phone's hardware step counter (no
-  extra apps needed) or taken from **Health Connect** (Google Fit, Mi Fitness, Zepp, Samsung Health…), 20 built-in workout templates (MET-based),
-  custom templates, manual entries.
-- **Heart** — blood pressure and pulse log, ACC/AHA classification, charts, heart-rate zones.
-- **Body** — weight trend with moving average, body fat (measured or US Navy estimate),
-  BMI, waist-to-height ratio, healthy weight range.
-- **Tips** — fresh air and ventilation, drinking water and filters, cancer risk factors and
-  screening, sun safety, back health, sleep, blood pressure, nutrition.
-- **Fully configurable** — language, enable/disable sections, theme & accent color, animations,
-  goal pace slider (−1.5…+1.5 kg/week), custom nutrient limits, water presets and thresholds,
-  hints on/off.
-- **Sensible at any body weight** — protein and water targets use an adjusted reference weight,
-  so they stay realistic at high body weight.
-- **Export / import** — the full dataset as one JSON file.
+- **Food** — 12 daily scales (calories, protein, fat, carbs, sugar, added sugar, sodium, fibre,
+  saturated and trans fat, cholesterol, potassium) with personal minimum, target and maximum,
+  computed from your profile, goal pace and today's activity. Limit-only nutrients show a limit.
+- **Fast food logging without AI** — recent foods, favourites, a bundled offline database
+  (CIS dishes plus ~2300 European foods from ANSES-CIQUAL), [Open Food Facts](https://openfoodfacts.org)
+  and USDA search, barcodes, counting by pieces, custom foods based on an existing product,
+  editable log entries and importable food packs.
+- **Energy balance** — intake vs expenditure (BMR × lifestyle + workouts + steps), surplus or
+  deficit converted into estimated fat mass; optional adaptive targets.
+- **Water** — one big button for water and a separate one for other drinks, charts, recommended
+  range and a clearly marked dangerous amount (hyponatremia).
+- **Activity** — background step counting from the phone's hardware sensor (no Google Fit
+  needed) or Health Connect, MET-based workout templates, custom workouts.
+- **Heart** — blood pressure and pulse log with ACC/AHA classification and heart-rate zones.
+- **Body** — weight trend (time-weighted average), body fat (measured, US Navy or BMI-based
+  estimate), BMI, waist-to-height ratio, healthy weight range.
+- **Pantry** (optional) — what you have at home, purchase and expiry dates, a freshness bar,
+  how much is left, nutrition tags and a reminder the day before a product expires.
+- **Tips** — fresh air, drinking water, cancer prevention, sun, back health, sleep, nutrition.
+- **Yours to configure** — English and Russian, sections on/off, theme and accent colour,
+  animations, goal pace slider, custom nutrient limits, JSON export/import.
 
-## Screens & stack
+Every formula and limit cites its source (WHO, IOM/EFSA, ACC/AHA, USDA…) in
+[`src/lib/calc.ts`](src/lib/calc.ts) and is covered by unit tests.
 
-- [Expo](https://expo.dev) SDK 57 · React Native 0.86 · TypeScript · Expo Router
-- Charts are hand-written with `react-native-svg` (no charting dependency)
-- State: a ~100-line store on `useSyncExternalStore`, persisted to AsyncStorage
-- i18n: typed dictionaries (`src/i18n`), no runtime library
-- Icons: [Lucide](https://lucide.dev); background steps: Health Connect
+## Install
 
-See [docs/architecture.md](docs/architecture.md) for a tour of the code.
-
-## Getting started
-
-Requirements: Node 20+, JDK 17–21, Android SDK (Android Studio).
-
-```bash
-npm install
-npm run android        # builds a dev client and runs it on a device/emulator
-```
-
-Build a release APK locally:
-
-```bash
-npx expo prebuild --platform android
-npm run build:apk      # → android/app/build/outputs/apk/release/app-release.apk
-```
-
-> The generated `android/` folder is not committed (Continuous Native Generation).
-> Configure native behaviour in `app.json` instead.
-
-Quality checks (also run in CI):
-
-```bash
-npm run check          # typecheck + lint + unit tests
-```
+Download the APK from [Releases](https://github.com/timmylich/wellness/releases/latest) and open
+it on your phone (allow installing from your browser or file manager when asked). The app can
+notify you about new versions (Settings → Notifications). An F-Droid listing is planned.
 
 ## Privacy
 
-All data is stored locally. The only network request is the optional Open Food Facts search,
-which sends nothing but the search text or barcode. It can be turned off in settings.
-Health Connect access is optional and read-only (steps), and stays on the device.
+All data is stored only on the device. Optional network requests:
 
-## Medical disclaimer
+| Request | What is sent | Can be turned off |
+| --- | --- | --- |
+| Food search (Open Food Facts, USDA) | the search text or barcode | Settings → Food |
+| Update check (GitHub Releases) | nothing but a request to `api.github.com` | Settings → Notifications |
 
-Wellness is not a medical device. Recommendations are general guidelines for healthy adults
-(WHO, IOM/EFSA, ACC/AHA) and do not replace a doctor's advice.
+Health Connect access is optional and read-only (steps). There are no analytics, crash
+reporters, ads or Google Play services in the app.
+
+## Tech
+
+- [Expo](https://expo.dev) SDK 57 · React Native 0.86 · TypeScript · Expo Router
+- Hand-written SVG charts (`react-native-svg`), a ~100-line store on `useSyncExternalStore`
+- A small local Kotlin module (`modules/wellness-native`) for the step counter service, local
+  notifications and nested-gesture handling
+- Typed i18n dictionaries (`src/i18n`), [Lucide](https://lucide.dev) icons
+
+See [docs/architecture.md](docs/architecture.md) for a tour of the code.
+
+## Build from source
+
+Requirements: Node 20+, JDK 17–21, Android SDK.
+
+```bash
+npm install
+npm run android                         # dev build on a device or emulator
+npx expo prebuild --platform android    # generate the native project
+npm run build:apk                       # → android/app/build/outputs/apk/release/
+npm run check                           # typecheck + lint + tests (also run in CI)
+```
+
+The `android/` folder is generated (Continuous Native Generation) and not committed; configure
+native behaviour in `app.json`. Releases are built by GitHub Actions — see
+[docs/releasing.md](docs/releasing.md).
+
+## Support the project
+
+Wellness is free and built in spare time. If it helps you:
+
+- ⭐ [Star the repository](https://github.com/timmylich/wellness) — it helps others find it
+- 💳 Donate via Tribute (cards, crypto, SBP): [in Telegram](https://t.me/tribute/app?startapp=dRVs) · [in the browser](https://web.tribute.tg/d/RVs)
+- 📣 Follow the author on Telegram: [@timmylich_portfolio](https://t.me/timmylich_portfolio)
+
+<details>
+<summary>Crypto addresses</summary>
+
+| Network | Address |
+| --- | --- |
+| Ethereum and EVM networks (BNB Chain, Base, Arbitrum, Optimism, Polygon) | `0xe790989b801ddbc706f391b10bec0e6c1a1fd334` |
+| Solana | `HJq4ocLn8eua95WKQs82N4hZ2S7VABANefTrSoUqo6rb` |
+| TRON | `TMKejJ5a5unasnZiVZ1Vz8GvkXsDj7mvPE` |
+| TON (Gram, W5 wallet) | `UQCOymZAvj5ho73JlD1s1-qo-pD-bqIQ-H_Y4FEjX7Sp68rI` |
+
+Double-check the network before sending.
+</details>
 
 ## Contributing
 
-Contributions are welcome — code, translations, food data and health tips.
-Please read [CONTRIBUTING.md](CONTRIBUTING.md).
+Code, translations, food data and health tips are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Medical disclaimer
+
+Wellness is not a medical device. Recommendations are general guidelines for healthy adults and
+do not replace a doctor's advice.
 
 ## License
 
-[MIT](LICENSE). Food data from Open Food Facts is available under the
-[ODbL](https://opendatacommons.org/licenses/odbl/1-0/); ANSES-CIQUAL 2020 data under the
-[Etalab Open Licence 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/).
+Wellness is free software: you can redistribute and modify it under the terms of the
+[GNU Affero General Public License v3](LICENSE). Modified versions you distribute (or run as a
+network service) must be released under the same license with their source code.
 
-Building with push notifications requires your own `google-services.json` (see
-[docs/notifications.md](docs/notifications.md)).
+Food data: Open Food Facts — [ODbL](https://opendatacommons.org/licenses/odbl/1-0/);
+ANSES-CIQUAL 2020 — [Etalab Open Licence 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/).
+Icons: Lucide (ISC).
 
 ---
 
 ## По-русски
 
-**Wellness** — бесплатный трекер здоровья с открытым кодом. Без рекламы, регистрации и слежки:
-все данные хранятся только на телефоне.
+**Wellness** — бесплатный трекер здоровья с открытым кодом. Без рекламы, регистрации, слежки и
+сервисов Google: все данные хранятся только на телефоне.
 
-- **Питание**: 12 шкал с личными диапазонами (минимум — цель — максимум), база продуктов СНГ,
-  поиск в Open Food Facts (в том числе Додо Пицца), штрихкоды, свои продукты, избранное,
-  «повторить вчера», графики, энергобаланс с пересчётом в жировую массу, советы.
-- **Вода**: большая кнопка, история, графики, норма и опасный диапазон.
-- **Активность**: шагомер или фоновый подсчёт шагов через Health Connect, шаблоны тренировок, свои нагрузки.
-- **Сердце**: давление и пульс, классификация, графики, пульсовые зоны.
-- **Тело**: вес, % жира, талия, ИМТ, подходящий вес.
+- **Еда**: 12 шкал с личными диапазонами (минимум — цель — максимум), офлайн-база продуктов,
+  поиск в Open Food Facts и USDA, штрихкоды, счёт по штукам, свои продукты на основе готовых,
+  редактирование записей, энергобаланс, советы.
+- **Вода**: большая кнопка для воды и отдельная для напитков, графики, норма и опасный объём.
+- **Активность**: фоновый подсчёт шагов датчиком телефона (без Google Fit) или Health Connect,
+  шаблоны тренировок.
+- **Сердце**: давление и пульс, классификация, пульсовые зоны.
+- **Тело**: вес со взвешенным средним, % жира, талия, ИМТ, подходящий вес.
+- **Продукты** (по желанию): что есть дома, сроки годности, полоса свежести, сколько осталось,
+  метки состава и напоминание за день до окончания срока.
 - **Советы**: воздух, вода, профилактика рака, солнце, спина, сон.
-- Всё настраивается: язык (русский/английский), разделы, тема, анимации, темп ползунком; экспорт и импорт данных.
 
-Хотите помочь? Смотрите [CONTRIBUTING.md](CONTRIBUTING.md).
+**Установка**: скачайте APK со страницы [Releases](https://github.com/timmylich/wellness/releases/latest).
+
+**Поддержать автора**: ⭐ [звезда на GitHub](https://github.com/timmylich/wellness) ·
+💳 Tribute — карты, крипта, СБП ([в Telegram](https://t.me/tribute/app?startapp=dRVs),
+[в браузере](https://web.tribute.tg/d/RVs)) · 📣 [Telegram-канал](https://t.me/timmylich_portfolio).
+Адреса криптокошельков — в разделе [Support the project](#support-the-project).
+
+Лицензия — [GNU AGPL v3](LICENSE): код можно использовать и изменять, но любые распространяемые
+изменённые версии обязаны оставаться открытыми под той же лицензией.

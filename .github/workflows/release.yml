@@ -1,0 +1,92 @@
+# Builds a signed release APK and publishes a GitHub Release when a version tag is pushed:
+#   git tag v0.5.0 && git push origin v0.5.0
+# Release notes are taken from the matching section of CHANGELOG.md.
+# Required repository secrets (see docs/releasing.md):
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm run check
+
+      - name: Check that the tag matches app.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          APP=$(node -p "require('./app.json').expo.version")
+          TAG=${GITHUB_REF_NAME#v}
+          if [ "$APP" != "$TAG" ]; then echo "app.json version $APP != tag $TAG"; exit 1; fi
+
+      - name: Generate the native project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease bundleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64
+
+      - name: Sign APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then echo "::error::Signing secrets are not set (docs/releasing.md)"; exit 1; fi
+          echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          VERSION=$(node -p "require('./app.json').expo.version")
+          OUT="wellness-$VERSION.apk"
+          "$BT/zipalign" -f -p 4 android/app/build/outputs/apk/release/app-release.apk aligned.apk
+          "$BT/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD \
+            --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD --out "$OUT" aligned.apk
+          "$BT/apksigner" verify --print-certs "$OUT"
+          sha256sum "$OUT" > "$OUT.sha256"
+          # App bundle (.aab) for stores that prefer it (RuStore, AppGallery, Amazon).
+          AAB="wellness-$VERSION.aab"
+          cp android/app/build/outputs/bundle/release/app-release.aab "$AAB"
+          jarsigner -keystore release.jks -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" "$AAB" "$KEY_ALIAS"
+          rm release.jks aligned.apk
+          echo "AAB=$AAB" >> "$GITHUB_ENV"
+          echo "APK=$OUT" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md" > notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Wellness ${{ env.VERSION }}
+          body_path: notes.md
+          files: |
+            ${{ env.APK }}
+            ${{ env.APK }}.sha256
+            ${{ env.AAB }}
+          draft: ${{ github.event_name == 'workflow_dispatch' }}

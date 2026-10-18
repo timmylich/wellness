@@ -19,9 +19,9 @@ export const en: Dict = {
     weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   },
-  tabs: { tips: 'Tips', overview: 'Overview', more: 'More' },
-  sections: { summary: 'Summary', nutrition: 'Food', water: 'Water', activity: 'Activity', heart: 'Heart', body: 'Body', tips: 'Tips' },
-  sectionsLong: { nutrition: 'Nutrition', water: 'Water balance', activity: 'Steps & workouts', heart: 'Heart & blood pressure', body: 'Body & weight', tips: 'Tips' },
+  tabs: { tips: 'Tips', overview: 'Overview', more: 'More', pantry: 'Pantry', health: 'Health' },
+  sections: { summary: 'Summary', nutrition: 'Food', water: 'Water', activity: 'Activity', heart: 'Heart', body: 'Body', pantry: 'Pantry', health: 'Health', tips: 'Tips' },
+  sectionsLong: { nutrition: 'Nutrition', water: 'Water balance', activity: 'Steps & workouts', heart: 'Heart & blood pressure', body: 'Body & weight', pantry: 'Pantry (expiry dates)', health: 'Health records: visits and tests', tips: 'Tips' },
   meals: { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' },
   greeting: (h: number, name: string) => {
     const part = h < 6 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
@@ -121,7 +121,7 @@ export const en: Dict = {
     pressure: 'Blood pressure', weight: 'Weight', tapToUpdate: 'Tap to update', noEntries: 'No entries',
   },
 
-  fab: { add: 'Add', title: 'What to log?', food: 'Food', water: 'Water', workout: 'Workout', steps: 'Steps', heart: 'Blood pressure & pulse', body: 'Weight & measurements' },
+  fab: { add: 'Add', title: 'What to log?', food: 'Food', water: 'Water', workout: 'Workout', steps: 'Steps', heart: 'Blood pressure & pulse', body: 'Weight & measurements', pantry: 'Pantry item' },
 
   nutrition: {
     pages: { calories: 'Calories & macros', quality: 'Diet quality', balance: 'Balance & advice', trends: 'Trends' },
@@ -140,7 +140,7 @@ export const en: Dict = {
     swipeHint: 'Swipe the cards sideways',
     sheet: {
       today: 'Today', about: 'What it is', recs: 'Recommendations', top: 'Foods contributing today', noFoods: 'None of today’s entries contain this nutrient',
-      share: (p: number) => `${Math.round(p)} % of total`, ofTarget: (p: number) => `${Math.round(p)} % of target`,
+      share: (p: number) => `${Math.round(p)} % of total`, ofTarget: (p: number) => `${Math.round(p)} % of target`, ofLimit: (p: number) => `${Math.round(p)} % of the limit`,
     },
   },
 
@@ -156,8 +156,11 @@ export const en: Dict = {
     per100: '/100 g',
     barcode: 'By barcode', find: 'Find',
     barcodeMissing: 'No product with this barcode. Create it manually — it will be saved to your database.',
-    create: 'Create food', quick: 'Quick: kcal', repeatYesterday: 'Same as yesterday',
-    repeatTitle: 'Copy yesterday?', repeatText: 'All of yesterday’s food entries will be added to the selected day.', repeatOk: 'Copy',
+    create: 'Create food', quick: 'Quick: kcal',
+    total: (g: number) => `Total: ${n(g, 1)} g`,
+    pieces: 'Pieces', perPiece: 'Grams per piece', noSalt: 'Salt not listed', editData: 'Edit data',
+    base: 'Start from a product', baseHint: 'The chosen product fills the form — just add or correct what differs.', baseNone: 'No base', basePick: 'Pick a base product',
+    entryEditNote: 'Changes are saved only to this log entry and to Recent.',
     amount: 'Amount', step: 'Step', portion: (g: number) => `serving ${g} g`,
     preview: (k: number, p: number, f: number, c: number, s: number, salt: number) =>
       `${n(k)} kcal · P ${n(p, 1)} · F ${n(f, 1)} · C ${n(c, 1)} · sugar ${n(s, 1)} g · salt ${n(salt, 1)} g`,
@@ -169,7 +172,7 @@ export const en: Dict = {
 
   water: {
     status: { low: 'Below minimum — have some water', ok: 'In range, but not at the goal yet', good: 'Goal reached', high: 'Above your usual norm — don’t overdo it', danger: 'Dangerous amount! Risk of hyponatremia' },
-    kinds: { water: 'Water', other: 'Other drink' },
+    kinds: { water: 'Water', other: 'Drink' },
     otherHint: 'Tea, coffee, juice, milk, soup… Counted for the danger limit but not towards your plain-water target.',
     journal: 'Log', pure: 'Plain water', otherDrunk: 'Other drinks', totalFluid: 'Total fluid',
     dangerNote: (l: number) => `The danger limit counts all fluid you drank (now ${n(l, 2)} L).`,
@@ -187,7 +190,7 @@ export const en: Dict = {
   },
 
   activity: {
-    steps: 'Steps', goal: 'Goal', distance: '≈ Distance', extra: 'Extra burn',
+    serviceTitle: 'Step counting', serviceText: 'Tap to hide this notification. Counting continues.', hideNotification: 'Hide the step notification', hideNotificationHint: 'Android requires a notification for background work. Switch off the “Step counting” channel — steps keep being counted.', steps: 'Steps', goal: 'Goal', distance: '≈ Distance', extra: 'Extra burn',
     stepsHintTitle: 'How steps are counted',
     stepsHintBaseline: (b: number) => `The first ${n(b)} steps are already included in your everyday activity level, so calories are counted only above that.`,
     info: {
@@ -244,7 +247,7 @@ export const en: Dict = {
 
   body: {
     now: 'Now', weight: 'Weight', target: 'Goal', height: 'Height', bmi: 'BMI', fat: 'Body fat', whtr: 'Waist/height',
-    bmiLine: (l: string) => `BMI: ${l}`, fatLine: (l: string, est: boolean) => `Body fat: ${l}${est ? ' (estimated from measurements)' : ''}`,
+    bmiLine: (l: string) => `BMI: ${l}`, fatLine: (l: string, est: 'navy' | 'bmi' | null) => `Body fat: ${l}${est === 'navy' ? ' (estimated from measurements)' : est === 'bmi' ? ' (rough estimate from BMI and age, ±4 %; add waist and neck for a better one)' : ''}`,
     healthy: 'Healthy weight', healthyLine: (h: number, a: number, b: number) => `By BMI for ${n(h)} cm: ${n(a, 1)}–${n(b, 1)} kg`,
     devine: (w: number) => `Ideal weight (Devine formula): ${n(w, 1)} kg`,
     refWeight: (w: number) => `Protein and water targets use an adjusted weight of ≈ ${n(w, 1)} kg`,
@@ -255,7 +258,8 @@ export const en: Dict = {
     navy: (v: number) => `Body fat estimate from measurements (US Navy method): ${n(v, 1)} %`,
     weighTitle: 'How to weigh yourself',
     weigh: 'In the morning, after the bathroom, before eating or drinking, in the same clothes. Weight fluctuates 1–2 kg with water and salt — watch the trend line.',
-    trend: 'Weight trend', trendNote: 'The bright line is the smoothed trend (7 readings). The green zone is a healthy BMI weight.',
+    trend: 'Weight trend', trendNote: 'The bright line is the weighted average (exponential, each reading weighted by the time since the previous one, 7-day half-life). The green zone is a healthy BMI weight.',
+    avgLine: (from: number, to: number | null) => to == null ? `Weighted average: ${from.toFixed(1)} kg` : `Weighted average: ${from.toFixed(1)} → ${to.toFixed(1)} kg`,
     change: (d: number, since: string) => `Change: ${d > 0 ? '+' : ''}${n(d, 1)} kg since ${since}`,
     first: 'Add your first weigh-in', log: 'Log',
     logParts: { kg: 'kg', fat: '% fat', waist: 'waist', neck: 'neck', hip: 'hips', height: 'height' },
@@ -263,19 +267,45 @@ export const en: Dict = {
     fatCat: { essential: 'Below essential minimum', athletic: 'Athletic', fit: 'Fit', average: 'Average', high: 'High' },
   },
 
+  health: {
+    title: 'Health', empty: 'Keep doctor visits, lab tests and checkups here — with photos of reports and results.',
+    add: 'New record', edit: 'Record', kinds: { visit: 'Doctor visit', test: 'Lab test', other: 'Other' },
+    titleLabel: 'What', titlePh: 'GP, blood test, MRI…', place: 'Doctor, clinic or lab', notes: 'Notes and results',
+    date: 'Date', photos: 'Photos', addPhoto: 'Gallery', takePhoto: 'Camera', save: 'Save', remove: 'Delete record',
+    removeTitle: 'Delete this record?', removeText: 'Its photos will be deleted too.', search: 'Search records',
+    privacy: 'Records and photos stay on the phone; backups include records but not photos.',
+  },
+
+  pantry: {
+    title: 'Food at home', empty: 'Add what you have at home — the app will tell you what is about to spoil.',
+    add: 'Add product', edit: 'Product', name: 'Name', namePh: 'Milk, cheese, chicken…', fromDb: 'From the food database',
+    base: 'Product type', baseHint: (d: number) => `Typical storage: ${d} days. The date on the package wins.`,
+    bought: 'Bought', expires: 'Best before', amount: 'Amount', left: 'Left',
+    daysLeft: (d: number) => (d === 0 ? 'Expires today' : d > 0 ? `${d} days left` : `Expired ${-d} days ago`),
+    soon: 'Expiring soon', expired: 'Expired', fresh: 'Fresh',
+    units: { g: 'g', ml: 'ml', pcs: 'pcs' },
+    finished: 'Finished', removeIn: (s: number) => `Finished — removed in ${s} s. Move the slider to keep it.`, save: 'Save', remove: 'Remove',
+    notifTitle: 'Expiring soon', notifBody: (name: string) => `${name} expires tomorrow.`,
+    tags: { protein: 'Protein', salty: 'Salty', addedSugar: 'Added sugar', cholesterol: 'Cholesterol', fat: 'Fat', sweet: 'Sweet', fiber: 'Fibre', lowKcal: 'Low kcal' },
+    source: 'Storage times: USDA FoodKeeper. Tags: UK FSA criteria and EU Regulation 1924/2006, per 100 g.',
+  },
+
   tips: { search: 'Search tips', source: 'Source', footer: 'Tips are for information only and do not replace a doctor’s advice.' },
 
   more: {
+    groups: { data: 'Data', settings: 'Settings', app: 'App' },
     profile: 'Profile', goal: 'Goal & pace', appearance: 'Appearance & language', sections: 'Sections', nutrition: 'Nutrition',
     waterActivity: 'Water & activity', steps: 'Steps & Health Connect', notifications: 'Notifications', data: 'Data & backups', support: 'Support the project', onboarding: 'Initial setup', about: 'About',
     subtitles: {
       profile: 'Sex, age, height, weight', goal: 'Goal weight, pace, activity', appearance: 'Theme, color, language, animations', sections: 'What to show',
       nutrition: 'Adaptive targets, online search, custom limits', waterActivity: 'Water buttons, threshold, step goal', steps: 'Step source, background counting',
-      notifications: 'Reminders (coming soon)', data: 'Export, import, cleanup', support: 'Donation reminders', onboarding: 'Re-enter height, weight, goal', about: 'Open source, license, sources',
+      notifications: 'Expiry dates, updates', data: 'Export, import, cleanup', support: 'Star, Telegram, donations', onboarding: 'Re-enter height, weight, goal', about: 'Open source, license, sources',
     },
   },
 
   settings: {
+    amoled: 'AMOLED: pure black', amoledHint: 'For the dark theme: pure black backgrounds, saves power on OLED screens.',
+    exported: (f: string) => `Backup saved: ${f}`,
     name: 'Name', bmrManual: 'Manual basal metabolic rate', bmrManualHint: (v: number) => `Leave empty to use the formula (${n(v)} kcal)`,
     lifestyle: 'Everyday activity (without workouts)',
     theme: 'Theme', themes: { system: 'System', light: 'Light', dark: 'Dark' },
@@ -297,9 +327,11 @@ export const en: Dict = {
     batteryHint: 'On Xiaomi, Huawei, Honor, Samsung and others, allow Wellness to autostart and remove battery restrictions — otherwise the system may postpone background step updates for a long time.',
     usdaKey: 'USDA FoodData Central key', usdaKeyHint: 'Optional. Without a key the shared, rate-limited DEMO_KEY is used. Get a free key at api.data.gov.',
     foodCache: (k: number) => `Online foods saved on this phone: ${k}`, clearCache: 'Clear food cache',
-    notifNote: 'Notifications are being prepared (Firebase Cloud Messaging). Your choices are saved and will take effect in a future version.',
-    notifEnabled: 'Allow notifications', waterReminders: 'Water reminders', weighIn: 'Weigh-in reminder',
-    notifUnavailable: 'Notifications are not wired up in this build yet.',
+    notifNote: 'Local notifications: they work offline and without Google services. Nothing is sent to any server.',
+    notifEnabled: 'Allow notifications', notifExpiry: 'Product expiry dates', notifUpdates: 'New versions', notifUpdatesHint: 'Check GitHub Releases once a day (the only request goes to api.github.com)',
+    checkUpdates: 'Check for updates', updateError: 'Could not check — GitHub is unreachable.',
+    updateAvailable: (v: string) => `Version ${v} is available — opening the download page.`, upToDate: (v: string) => `You have the latest version (${v}).`,
+    updateTitle: 'Wellness update available', updateBody: (v: string) => `Version ${v} is on GitHub. Tap to open.`,
     hcNote: 'Steps are counted in the background and pulled from Google Fit, Mi Fitness, Zepp, Samsung Health and other apps that write to Health Connect.',
     hcStatus: { checking: 'Checking Health Connect…', unavailable: 'Health Connect is not installed on this device.', update: 'Health Connect needs an update.', noPermission: 'No access to steps.', connected: 'Connected' },
     hcInstall: 'Install Health Connect', hcConnect: 'Allow access to steps', hcOpen: 'Open Health Connect settings',
@@ -307,13 +339,14 @@ export const en: Dict = {
     dataNote: 'All data is stored only on this device. Make backups!',
     export: 'Export backup', import: 'Import backup', importTitle: 'Import', importText: 'Current data will be replaced with the file’s data. Continue?',
     restored: 'Data restored', importPack: 'Import food pack', packAdded: (k: number) => `Foods added: ${k}`,
-    packHintTitle: 'What is a food pack', packHint: 'A JSON file with a list of foods — for example a restaurant chain’s menu. The community can build and share such packs. The format is described in the repository: docs/food-packs.md.',
+    packHintTitle: 'What is this?', packHint: 'A file with a ready-made list of foods and their nutrition — say, the whole menu of your favourite café, or the meals from a plan your dietitian sent you. After importing, these foods show up in search and work offline. You can get such files from friends or the project community. Can\'t find something? Create it yourself (Add food → Create product, optionally based on a similar one) or look it up by barcode.',
     wipe: 'Cleanup', wipeTitle: 'Delete data?', wipeText: (l: string) => `“${l}” will be cleared permanently.`,
     wipeLabels: { foodLog: 'Food log', water: 'Water', workouts: 'Workouts', steps: 'Steps', heart: 'Blood pressure', body: 'Body measurements' },
     redoOnboarding: 'Run the initial setup again', wipeAll: 'Delete all data', wipeAllTitle: 'Delete EVERYTHING?', wipeAllText: 'All entries, foods and settings will be deleted. Export a backup first!',
     donations: 'Donation reminders', donationsHint: 'Occasionally (on day 3, 7, 14, 30, 60, 90… of use) ask to support the project.',
     usage: (d: number, s: number, pending: boolean) => `Days of use: ${d}. Reminders shown: ${s}.${pending ? ' One is pending.' : ''}`,
     resetDonations: 'Reset shown reminders',
+    previewDonation: 'Show the support window (test)',
     shareUnavailable: 'File sharing is not available on this device', notBackup: 'This file does not look like a Wellness backup', noFoods: 'The file has no foods list',
   },
 
@@ -321,13 +354,24 @@ export const en: Dict = {
     title: (d: number) => `${d} days with Wellness!`,
     text: 'The app is free, with no ads or tracking, and open source. If it helps you, please support development with a small donation.',
     support: 'Support the project', later: 'Not now', note: 'You can turn these reminders off in settings.',
+    previewTitle: 'Support Wellness',
+    ways: 'Ways to support',
+    tribute: 'Tribute', tributeHint: 'Bank cards, crypto, SBP', tributeTelegram: 'Tribute in Telegram', tributeWeb: 'Tribute in the browser',
+    crypto: 'Cryptocurrency',
+    wallets: { evm: 'Ethereum & EVM networks', sol: 'Solana', tron: 'TRON', ton: 'TON (Gram)' },
+    star: 'Star on GitHub', money: 'Support financially', moneyHint: 'Cards, crypto, SBP', telegram: 'Follow on Telegram',
+    lost: (kg: number) => `You've lost about ${n(kg, 1)} kg so far — great work! Glad Wellness could help.`,
+    screenTitle: 'Support the author', screenText: 'Wellness is built in spare time. Any amount helps ship updates and keep the app free.',
+    copy: 'Copy address', copied: 'Address copied', soon: 'soon',
+    evmNote: 'One address for all EVM networks. Double-check the network before sending: coins sent on the wrong network may be lost.',
+    back: 'Back',
   },
 
   about: {
     version: (v: string) => `Version ${v}`, openSource: 'Open source',
-    openSourceText: 'Wellness is free software under the MIT license. No ads, accounts, analytics or trackers.',
+    openSourceText: 'Wellness is free software under the GNU AGPL v3 license. No ads, accounts, analytics or trackers.',
     github: 'Source code on GitHub', privacy: 'Privacy',
-    privacyText: 'All data stays on your device. The only network requests are the optional Open Food Facts search and, if you enable it, reading steps from Health Connect on the phone itself.',
+    privacyText: 'All data stays on your device. The only network requests are the food search (Open Food Facts, USDA) and the GitHub update check, both optional. Reading steps from Health Connect is opt-in and stays on the phone.',
     sources: 'Sources',
     sourcesList: [
       'Basal metabolism: Mifflin–St Jeor (1990)', 'Sugar, salt, potassium, trans fat: WHO guidelines', 'Protein, fat, carbs, fiber: US DRI (IOM), EFSA',

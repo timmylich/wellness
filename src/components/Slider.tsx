@@ -24,6 +24,8 @@ interface Box {
   step: number;
   startX: number;
   onChange: (v: number) => void;
+  onComplete?: (v: number) => void;
+  haptics: boolean;
 }
 
 /** Convert a thumb x-position to a stepped value and report it if it changed. */
@@ -33,7 +35,7 @@ function applyMove(b: Box, x: number) {
   const v = Number((Math.round(raw / b.step) * b.step).toFixed(4));
   if (v !== b.value) {
     b.value = v;
-    Haptics.selectionAsync().catch(() => {});
+    if (b.haptics) Haptics.selectionAsync().catch(() => {});
     b.onChange(v);
   }
 }
@@ -44,25 +46,31 @@ export function Slider({
   max,
   step,
   onChange,
+  onComplete,
   zones = [],
   marks = [],
+  haptics = true,
 }: {
   value: number;
   min: number;
   max: number;
   step: number;
   onChange: (v: number) => void;
+  /** Called once when the drag ends, with the final value (commit expensive updates here). */
+  onComplete?: (v: number) => void;
   zones?: SliderZone[];
   /** Values to draw small tick marks at (e.g. 0 for "maintain"). */
   marks?: number[];
+  /** Haptic tick on every step (off for fine 1 % sliders). */
+  haptics?: boolean;
 }) {
   const c = useTheme();
   const [width, setWidth] = useState(0);
   const [dragging, setDragging] = useState(false);
   // The PanResponder is created once; this mutable box feeds it the latest props.
-  const [box] = useState(() => ({ width, value, onChange, min, max, step, startX: 0 }));
+  const [box] = useState(() => ({ width, value, onChange, onComplete, min, max, step, haptics, startX: 0 }));
   useEffect(() => {
-    Object.assign(box, { width, value, onChange, min, max, step });
+    Object.assign(box, { width, value, onChange, onComplete, min, max, step, haptics });
   });
 
   const track = Math.max(1, width - THUMB);
@@ -80,8 +88,14 @@ export function Slider({
         applyMove(box, box.startX);
       },
       onPanResponderMove: (_, g) => applyMove(box, box.startX + g.dx),
-      onPanResponderRelease: () => setDragging(false),
-      onPanResponderTerminate: () => setDragging(false),
+      onPanResponderRelease: () => {
+        setDragging(false);
+        box.onComplete?.(box.value);
+      },
+      onPanResponderTerminate: () => {
+        setDragging(false);
+        box.onComplete?.(box.value);
+      },
     }),
   );
 
@@ -93,8 +107,9 @@ export function Slider({
       style={{ height: THUMB + 12, justifyContent: 'center' }}
       {...responder.panHandlers}
     >
+      {/* Children ignore touches, so locationX is always relative to the track, not the thumb. */}
       {width > 0 && (
-        <>
+        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center' }}>
           <View style={{ position: 'absolute', left: THUMB / 2, right: THUMB / 2, height: 8, borderRadius: 4, backgroundColor: c.cardAlt, overflow: 'hidden' }}>
             {zones.map((z, i) => (
               <View key={i} style={{ position: 'absolute', left: toX(z.from), width: toX(z.to) - toX(z.from), top: 0, bottom: 0, backgroundColor: z.color }} />
@@ -124,7 +139,7 @@ export function Slider({
             pointerEvents="none"
             style={{ position: 'absolute', left: thumbX - 6, width: THUMB + 12, height: THUMB + 12, borderRadius: (THUMB + 12) / 2, backgroundColor: alpha(c.accent, dragging ? 0.18 : 0) }}
           />
-        </>
+        </View>
       )}
     </View>
   );

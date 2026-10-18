@@ -6,6 +6,138 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Health tab: doctor visits, lab tests and other records with photos (stored privately on the
+  phone).
+- Pantry moved to the bottom bar.
+
+### Changed
+- Food amount is entered as pieces × grams per piece (1 piece by default).
+- Section bar is translucent with a blur; with many sections it shows icons only.
+- Food trend charts always end today; switching days animates the date first.
+- Nutrition card height springs to the current card.
+- Bottom sheets: drag the grabber down to close; content stays while the sheet animates out;
+  focused fields scroll above the keyboard (also on full screens).
+- Pantry: 1 % slider steps without vibration; a finished item stays until you leave the
+  screen; picking a type fills an empty name; far dates show the year.
+- Donation reminders can no longer be turned off; the payment hint sits inside the button.
+
+- Section bar: a rounded pill only under the tabs (no full-width blur); "+" button without
+  glow; more than four quick actions are laid out in a grid; no "Add pantry item".
+- Food cards expand to full height; the "how to read" hint no longer stutters.
+- Pieces are stored with a food entry; a new custom food opens its amount sheet right away.
+- A finished pantry item shows a 5-second countdown before it disappears.
+- Removed the greeting and the background-permission hints for steps.
+
+- AMOLED option for the dark theme (pure black backgrounds).
+- Faster startup: inline requires; the CIQUAL table loads on first search. Nutrition carousel
+  dots run on the native thread.
+- App-styled switches; lighter light theme; softer icon glows on light backgrounds.
+- Section bar: solid rounded background only under the tabs (no blur).
+- Food search needs every word, in any order, and tolerates endings and small typos; online
+  results are filtered the same way. Added cooked spaghetti, rice, couscous, quinoa and more.
+- Pantry amounts in g, ml or pieces; finished items slide out.
+- Backup export saves into a folder you pick.
+- Step notification: tap it (or Settings → Steps) to hide its channel; counting continues.
+- Release builds are minified (R8, resource shrinking) and drop console logging; releases
+  also include a signed AAB. Store listing assets and a privacy policy (docs/PRIVACY.md,
+  docs/stores.md).
+
+- Swipe between bottom tabs; custom bottom bar whose highlight slides with the swipe.
+- Blood pressure, pulse and weight are entered with wheel pickers, prefilled with the last
+  values.
+- Charts restyled after Google Fit: smooth lines, dashed target and drop line, haloed marker,
+  pill-shaped value bubble above the point.
+- Nutrition cards change with a lighter swipe; page dots with a sliding indicator.
+- Onboarding offers theme, AMOLED and adaptive targets.
+- Food packs are explained in plain words, with alternatives.
+
+### Fixed
+- Notification icon was a blank square.
+- Bottom sheets paused for a few frames after a swipe-down release.
+- Food amount sheet closed without animation (backdrop tap, released drag).
+- Chart value bubble was clipped at the top.
+- Crash when adding food ("addViewAt … already has a parent"): LayoutAnimation is no longer
+  used (it is unstable with the new architecture on Android).
+- Sliders jumped to the minimum when the thumb itself was touched.
+- Lag after adding food before returning to the Food screen.
+
+## [0.5.0] — 2026-10-10
+
+### Added
+- Step counting through a small foreground service that keeps the hardware step counter
+  registered (as Google Fit does via Play services). On many phones the counter only counts
+  while someone listens, so the periodic background read used before saw no steps.
+- Pantry section (optional): products at home with purchase and expiry dates, a freshness bar,
+  how much is left, nutrition tags (FSA / EU 1924/2006 criteria) and a reminder the day before
+  expiry. Base shelf lives from USDA FoodKeeper.
+- Counting food by pieces (±1 piece, ±10 g per piece); portion buttons 50/100/200/300/450 g.
+- Edit the food data of a log entry; create a product from a base product.
+- "Salt not listed" tag for foods without sodium data.
+- Body fat estimate from BMI and age (Deurenberg 1991) when there are no measurements.
+- App-styled dialogs instead of the system Alert.
+- Support window: GitHub star, financial support screen (Tribute, EVM, Solana, TRON, TON
+  addresses) and Telegram; shows the weight lost while actively using the app. Milestones:
+  3, 7, 14, 30 days, then every 30 days.
+- Optional update check against GitHub Releases with a local notification.
+- Release workflow (signed APK + checksum on tag), F-Droid metadata, docs/releasing.md.
+
+### Changed
+- License: GNU AGPL v3 (was MIT).
+- Firebase removed; notifications are local (no Google Play services).
+- "More" is grouped into Data, Settings and App, with uniform icon tiles.
+- Nutrition is called "Food" in the section bar; "Other drink" is now "Drink".
+- Fat and carb targets always sit above their minimums.
+- Food search: buttons on top, instant local results, online search after a pause, shorter
+  recent list, no "Repeat yesterday".
+- Switching days slides the date and morphs charts from the previous day's values.
+- Activity templates keep even gaps; "+" actions sit closer to the button.
+
+### Fixed
+- Section bar highlight looked patchy where its pieces overlapped; the bar is centred for any
+  active tab.
+- Expandable hints no longer shrink when tapped.
+
+## [0.4.2] — 2026-10-09
+
+### Added
+- Support window: Tribute link and crypto addresses (EVM networks, Solana, TRON), tap to copy.
+  Channels are configured in `src/data/donate.ts`; empty entries show "soon". Settings → Support
+  can open the window for testing and lists the same options.
+- Weight form shows recent weigh-ins with the weighted average line, including the value being
+  typed.
+- Native `NestedScrollHost` view (local module) that keeps carousel swipes and chart scrubbing
+  away from the section pager without racing the JS thread.
+
+### Changed
+- Weight trend is a time-weighted exponential average (7-day half-life) instead of a 7-reading mean.
+- Water section: separate buttons for water and other drinks instead of a switch.
+- Section bar animates on the native thread (transforms only): no lag or jitter at the end.
+- Pace slider commits to storage only on release (dragging no longer re-renders the app).
+- Quick-add labels wrap to the spacing between buttons instead of overlapping.
+
+## [0.4.1] — 2026-10-09
+
+### Added
+- Press and hold a chart to highlight a day and show its value.
+- Separate quick button for other drinks next to the water button on the overview.
+- Bottom sheets close with a swipe down.
+- Switching days in Nutrition replays chart and journal animations.
+
+### Changed
+- Section pager uses the native `react-native-pager-view`: smoother swipes, instant tab taps,
+  nested carousels no longer move the whole page. The section bar is centred.
+- Calorie range: the minimum is the energy that covers the macro minimums (never below
+  1200 kcal); when losing weight the target sits in the middle, so averaging the middle gives the
+  chosen pace.
+- Limit-only nutrients (sugar, added sugar, cholesterol, saturated and trans fat) show a
+  limit instead of a target.
+
+### Fixed
+- Device steps: use the wake-up step counter; on some Xiaomi/Qualcomm phones the non-wake-up
+  variant only re-delivers a stale value, so no steps were counted.
+- Possible crash when adding food (sheet and screen were torn down in the same frame).
+
 ## [0.4.0] — 2026-10-07
 
 ### Added

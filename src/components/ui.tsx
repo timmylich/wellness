@@ -1,12 +1,10 @@
 /** Shared UI primitives. Keep these small and theme-aware; screens compose them. */
-import { useEffect, useState, type ReactNode } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import {
-  Alert,
   Animated,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -17,10 +15,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { resolveLang, useT } from '../i18n';
+import { useKeyboardAvoid } from '../lib/keyboard';
 import { animateLayout, dur, useMotion } from '../lib/motion';
 import { useTheme } from '../lib/theme';
 import { getState, useStore } from '../store/store';
 import { Collapse } from './Collapse';
+import { confirmDialog } from './Dialog';
 import { Icon, type IconName } from './Icon';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -74,8 +74,11 @@ export function Screen({
   children,
   scroll = true,
   bottomInset = 0,
+  title,
 }: {
   children: ReactNode;
+  /** Large page title (tab screens have no navigation header). */
+  title?: string;
   scroll?: boolean;
   /** Extra bottom padding, e.g. to clear a floating button. */
   bottomInset?: number;
@@ -83,11 +86,15 @@ export function Screen({
   const c = useTheme();
   const insets = useSafeAreaInsets();
   const style = { flex: 1, backgroundColor: c.bg };
-  const content = { padding: 16, paddingBottom: 32 + insets.bottom + bottomInset, gap: 12 };
+  const { keyboard, scrollRef, contentRef } = useKeyboardAvoid();
+  const content = { padding: 16, paddingBottom: 32 + insets.bottom + bottomInset + keyboard, gap: 12 };
   if (!scroll) return <View style={[style, content]}>{children}</View>;
   return (
-    <ScrollView style={style} contentContainerStyle={content} keyboardShouldPersistTaps="handled">
-      {children}
+    <ScrollView ref={scrollRef} style={style} contentContainerStyle={content} keyboardShouldPersistTaps="handled">
+      <View ref={contentRef} style={{ gap: 12 }}>
+        {title ? <T size={28} bold style={{ marginTop: 4 }}>{title}</T> : null}
+        {children}
+      </View>
     </ScrollView>
   );
 }
@@ -161,8 +168,11 @@ export function Button({
   style,
   disabled,
   big,
+  subtitle,
 }: {
   title: string;
+  /** Second, smaller line inside the button. */
+  subtitle?: string;
   onPress: () => void;
   kind?: 'primary' | 'secondary' | 'danger' | 'ghost';
   icon?: IconName;
@@ -177,7 +187,10 @@ export function Button({
     <Tap onPress={onPress} disabled={disabled} style={[styles.button, big && { paddingVertical: 16 }, { backgroundColor: bg }, style]}>
       <Row style={{ flexWrap: 'nowrap', justifyContent: 'center' }}>
         {icon ? <Icon name={icon} size={big ? 20 : 18} color={fg} /> : null}
-        <Text style={{ color: fg, fontWeight: '600', fontSize: big ? 17 : 15 }}>{title}</Text>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{ color: fg, fontWeight: '600', fontSize: big ? 17 : 15 }}>{title}</Text>
+          {subtitle ? <Text style={{ color: fg, opacity: 0.8, fontSize: 12 }}>{subtitle}</Text> : null}
+        </View>
       </Row>
     </Tap>
   );
@@ -225,8 +238,12 @@ export function Field({
   numeric = true,
   placeholder,
   hint,
+  search,
+  multiline,
 }: {
   label?: string;
+  search?: boolean;
+  multiline?: boolean;
   value: string;
   onChange: (v: string) => void;
   suffix?: string;
@@ -244,12 +261,19 @@ export function Field({
         <TextInput
           value={value}
           onChangeText={(v) => onChange(numeric ? v.replace(',', '.').replace(/[^0-9.]/g, '') : v)}
-          keyboardType={numeric ? 'decimal-pad' : 'default'}
           placeholder={placeholder}
           placeholderTextColor={c.textDim}
+          // Search fields: no autocorrect/suggestions, so keyboards deliver every character
+          // immediately instead of holding a composing word until space/Enter.
+          autoCorrect={search ? false : undefined}
+          autoComplete={search ? 'off' : undefined}
+          keyboardType={numeric ? 'decimal-pad' : 'default'}
+          returnKeyType={search ? 'search' : undefined}
+          multiline={multiline}
+          textAlignVertical={multiline ? 'top' : undefined}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          style={{ flex: 1, color: c.text, fontSize: 16, paddingVertical: 10 }}
+          style={{ flex: 1, color: c.text, fontSize: 16, paddingVertical: 10, minHeight: multiline ? 96 : undefined }}
         />
         {suffix ? <T dim>{suffix}</T> : null}
       </View>
@@ -258,22 +282,46 @@ export function Field({
   );
 }
 
+/** Row with a label and an app-styled switch; the whole row is tappable. */
 export function Toggle({ label, value, onChange, hint }: { label: string; value: boolean; onChange: (v: boolean) => void; hint?: string }) {
-  const c = useTheme();
   return (
-    <View style={styles.rowBetween}>
+    <Pressable style={styles.rowBetween} onPress={() => onChange(!value)} accessibilityRole="switch" accessibilityState={{ checked: value }}>
       <View style={{ flex: 1, paddingRight: 12 }}>
         <T>{label}</T>
         {hint ? <T dim size={12}>{hint}</T> : null}
       </View>
-      <Switch
-        value={value}
-        onValueChange={(v) => {
-          animateLayout();
-          onChange(v);
+      <Switcher value={value} />
+    </Pressable>
+  );
+}
+
+const SW_W = 46;
+const SW_H = 28;
+const KNOB = 22;
+
+/** Pill switch: soft track that fills with the accent, knob slides on the native thread. */
+function Switcher({ value }: { value: boolean }) {
+  const c = useTheme();
+  const motion = useMotion();
+  const [p] = useState(() => new Animated.Value(value ? 1 : 0));
+  useEffect(() => {
+    if (!motion) p.setValue(value ? 1 : 0);
+    else Animated.spring(p, { toValue: value ? 1 : 0, useNativeDriver: true, speed: 26, bounciness: 6 }).start();
+  }, [value, motion, p]);
+  const travel = SW_W - KNOB - 6;
+  return (
+    <View style={{ width: SW_W, height: SW_H, borderRadius: SW_H / 2, backgroundColor: c.cardAlt, borderWidth: 1, borderColor: c.border, justifyContent: 'center' }}>
+      <Animated.View style={{ position: 'absolute', left: -1, right: -1, top: -1, bottom: -1, borderRadius: SW_H / 2, backgroundColor: c.accent, opacity: p }} />
+      <Animated.View
+        style={{
+          width: KNOB,
+          height: KNOB,
+          borderRadius: KNOB / 2,
+          marginLeft: 2,
+          backgroundColor: '#fff',
+          elevation: 2,
+          transform: [{ translateX: p.interpolate({ inputRange: [0, 1], outputRange: [0, travel] }) }, { scale: p.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.86, 0.8, 1] }) }],
         }}
-        trackColor={{ true: c.accent }}
-        thumbColor="#fff"
       />
     </View>
   );
@@ -289,7 +337,7 @@ export function Hint({ title, children, force }: { title: string; children: Reac
   const [open, setOpen] = useState(false);
   if (!enabled && !force) return null;
   return (
-    <Tap scaleTo={0.98} onPress={() => setOpen(!open)} style={[styles.hint, { backgroundColor: c.accentSoft }]}>
+    <Tap scaleTo={1} onPress={() => setOpen(!open)} style={[styles.hint, { backgroundColor: c.accentSoft }]}>
       <Row style={{ flexWrap: 'nowrap' }}>
         <Icon name="info" size={18} color={c.accent} />
         <T color={c.accent} bold style={{ flex: 1 }}>{title}</T>
@@ -333,8 +381,8 @@ export function Empty({ text }: { text: string }) {
   return <T dim center style={{ paddingVertical: 12 }}>{text}</T>;
 }
 
-/** List row; long-press offers deletion. */
-export function ListItem({
+/** List row; long-press offers deletion. Memoised: logs re-render often. */
+export const ListItem = memo(function ListItem({
   title,
   subtitle,
   right,
@@ -353,17 +401,16 @@ export function ListItem({
   const L = useT();
   const confirmDelete = () =>
     onDelete &&
-    Alert.alert(L.common.deleteEntry, title, [
-      { text: L.common.cancel, style: 'cancel' },
-      {
-        text: L.common.delete,
-        style: 'destructive',
-        onPress: () => {
-          animateLayout();
-          onDelete();
-        },
+    confirmDialog({
+      title: L.common.deleteEntry,
+      message: title,
+      cancel: L.common.cancel,
+      ok: L.common.delete,
+      onOk: () => {
+        animateLayout();
+        onDelete();
       },
-    ]);
+    });
   return (
     <Tap scaleTo={0.98} onPress={onPress} onLongPress={confirmDelete} style={[styles.listItem, { borderColor: c.border }]}>
       {left}
@@ -374,7 +421,7 @@ export function ListItem({
       {right}
     </Tap>
   );
-}
+});
 
 export function Divider() {
   const c = useTheme();

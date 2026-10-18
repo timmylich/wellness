@@ -21,16 +21,97 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/ё/g, 'е').trim();
 }
 
-/** Every query word must appear in the name, brand or an alias (any language). */
-export function searchLocal(query: string, userFoods: Food[], lang: 'ru' | 'en', cached: Food[] = []): Food[] {
-  const words = norm(query).split(/\s+/).filter(Boolean);
+/**
+ * Forgiving word matcher: every query word must match some word of the food (name, brand,
+ * aliases), in any order. A word matches by its stem (endings dropped: "варёные" finds
+ * "варёных") or with a small typo (edit distance 1, or 2 for long words).
+ * Returns a score (higher = better) or 0 for no match.
+ */
+export function matchScore(f: Food, queryWords: string[]): number {
+  if (!queryWords.length) return 0;
+  const tokens = tokensOf(f);
+  let score = 0;
+  for (const w of queryWords) {
+    let best = 0;
+    for (const t of tokens) {
+      const s = wordScore(w, t);
+      if (s > best) best = s;
+      if (best === 3) break;
+    }
+    if (!best) return 0;
+    score += best;
+  }
+  // Prefer names where the first query word starts the name (e.g. "спагетти ..." for "спагетти").
+  if (tokens[0] && wordScore(queryWords[0], tokens[0]) >= 2) score += 1;
+  return score;
+}
+
+/** 3: exact/prefix, 2: same stem, 1: typo, 0: no match. */
+function wordScore(w: string, t: string): number {
+  if (t.startsWith(w)) return 3;
+  const stem = w.length >= 5 ? w.slice(0, Math.max(4, w.length - 2)) : w;
+  if (t.startsWith(stem)) return 2;
+  if (w.length >= 4) {
+    const max = w.length >= 7 ? 2 : 1;
+    // Compare with the token's prefix of similar length, so endings do not count as typos.
+    if (levenshtein(w, t.slice(0, w.length), max) <= max) return 1;
+    if (stem !== w && levenshtein(stem, t.slice(0, stem.length), max) <= max) return 1;
+  }
+  return 0;
+}
+
+/** Edit distance, stopping early once it exceeds `max`. */
+function levenshtein(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < rowMin) rowMin = cur[j];
+    }
+    if (rowMin > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+export function queryWords(query: string): string[] {
+  return norm(query).split(/[\s,.;()/-]+/).filter(Boolean);
+}
+
+/** Local search across user, built-in, cached and CIQUAL foods, best matches first. */
+export function searchLocal(query: string, userFoods: Food[], lang: 'ru' | 'en', cached: Food[] = [], limit = 60): Food[] {
+  const words = queryWords(query);
   if (!words.length) return [];
   const userIds = new Set(userFoods.map((f) => f.id));
   const all = [...userFoods, ...builtinFoods(lang), ...cached.filter((f) => !userIds.has(f.id)), ...ciqualFoods()];
-  return all.filter((f) => {
-    const hay = norm(`${f.name} ${f.brand ?? ''} ${(f.aliases ?? []).join(' ')}`);
-    return words.every((w) => hay.includes(w));
+  const hits: { f: Food; s: number; i: number }[] = [];
+  all.forEach((f, i) => {
+    const s = matchScore(f, words);
+    if (s) hits.push({ f, s, i });
   });
+  // Best score first; among equals keep source order (user foods, built-in, cache, CIQUAL).
+  hits.sort((a, b) => b.s - a.s || a.i - b.i);
+  return hits.slice(0, limit).map((h) => h.f);
+}
+
+/** Keep only online results that match every query word (APIs match any word). */
+export function filterOnline(foods: Food[], query: string): Food[] {
+  const words = queryWords(query);
+  return foods.filter((f) => matchScore(f, words) > 0);
+}
+
+// Normalised words per food object, computed once (thousands of foods per keystroke).
+const tokenCache = new WeakMap<Food, string[]>();
+function tokensOf(f: Food): string[] {
+  let t = tokenCache.get(f);
+  if (t == null) {
+    t = queryWords(`${f.name} ${f.brand ?? ''} ${(f.aliases ?? []).join(' ')}`);
+    tokenCache.set(f, t);
+  }
+  return t;
 }
 
 /** Merge local and online results into one list: local first, online duplicates dropped. */

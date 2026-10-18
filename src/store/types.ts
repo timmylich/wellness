@@ -8,7 +8,7 @@ export type Sex = 'male' | 'female';
 /** ISO calendar date in local time, e.g. "2026-10-06". */
 export type DateKey = string;
 
-export type SectionId = 'nutrition' | 'water' | 'activity' | 'heart' | 'body' | 'tips';
+export type SectionId = 'nutrition' | 'water' | 'activity' | 'heart' | 'body' | 'pantry' | 'health' | 'tips';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -86,6 +86,8 @@ export interface FoodEntry {
   /** Snapshot of the food so history stays correct if the food is edited later. */
   food: Food;
   grams: number;
+  /** How many pieces the grams were entered as (grams = pieces × grams per piece). */
+  pieces?: number;
 }
 
 export interface WaterEntry {
@@ -147,6 +149,8 @@ export interface Settings {
   animations: boolean;
   stepsSource: StepsSource;
   accent: string;
+  /** Dark theme with pure-black backgrounds (saves power on OLED screens). */
+  amoled: boolean;
   sections: Record<SectionId, boolean>;
   /** Shift daily calorie target to compensate the last 7 days' surplus/deficit. */
   adaptiveTargets: boolean;
@@ -166,7 +170,7 @@ export interface Settings {
   stepsInfoDismissed: boolean;
   /** Optional personal USDA FoodData Central API key (falls back to the rate-limited DEMO_KEY). */
   usdaApiKey: string;
-  /** Local/push notification preferences (push delivery is not wired up yet, see docs/notifications.md). */
+  /** Local notification preferences (see lib/notifications.ts). */
   notifications: NotificationSettings;
   /** Per-nutrient manual overrides of the daily target range. */
   nutrientOverrides: Partial<Record<NutrientKey, { min?: number; max?: number }>>;
@@ -174,8 +178,10 @@ export interface Settings {
 
 export interface NotificationSettings {
   enabled: boolean;
-  waterReminders: boolean;
-  weighInReminder: boolean;
+  /** Remind before pantry products expire. */
+  expiry: boolean;
+  /** Check GitHub Releases for a newer version and notify. */
+  updates: boolean;
 }
 
 /** Last reading of the hardware step counter, used to turn cumulative counts into daily steps. */
@@ -186,6 +192,8 @@ export interface StepCounterState {
   bootAt: number;
   /** Epoch ms of the last reading. */
   at: number;
+  /** Sensor variant the baseline came from; baselines without it are re-established. */
+  sensor?: 'wakeup';
 }
 
 export interface Meta {
@@ -195,8 +203,45 @@ export interface Meta {
   /** Usage-day milestones for which the donation prompt was already shown. */
   donationShown: number[];
   stepCounter?: StepCounterState;
-  /** Push token registered with the messaging provider, if any. */
-  pushToken?: string;
+  /** Last GitHub Releases check (ms) and the version the user was already notified about. */
+  updateCheckedAt?: number;
+  updateNotified?: string;
+  createdAt: number;
+}
+
+export type PantryUnit = 'g' | 'ml' | 'pcs';
+
+/** A product at home (the "Pantry" section): when bought, when it expires, how much is left. */
+export interface PantryItem {
+  id: string;
+  name: string;
+  /** Base product from data/shelfLife.ts used for the default shelf life. */
+  baseId?: string;
+  /** Nutrition snapshot (from the food database) used for the tags. */
+  per100g?: Partial<Nutrients>;
+  boughtAt: DateKey;
+  expiresAt: DateKey;
+  /** Package size, if known, in `unit` (grams by default). */
+  amountG?: number;
+  unit?: PantryUnit;
+  /** Fraction left, 0…1. */
+  left: number;
+  createdAt: number;
+}
+
+export type HealthRecordKind = 'visit' | 'test' | 'other';
+
+/** A medical record: doctor visit, lab test or other document, with attached photos. */
+export interface HealthRecord {
+  id: string;
+  date: DateKey;
+  kind: HealthRecordKind;
+  title: string;
+  /** Doctor, clinic or lab. */
+  place?: string;
+  notes?: string;
+  /** file:// URIs of photos copied into the app's document folder. */
+  photos: string[];
   createdAt: number;
 }
 
@@ -215,4 +260,6 @@ export interface AppData {
   steps: Record<DateKey, number>;
   heart: HeartEntry[];
   body: BodyEntry[];
+  pantry: PantryItem[];
+  health: HealthRecord[];
 }

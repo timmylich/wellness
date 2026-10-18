@@ -1,44 +1,33 @@
-# Notifications (Firebase Cloud Messaging)
+# Notifications
 
-Push notifications use Firebase Cloud Messaging (`@react-native-firebase/messaging`).
-`google-services.json` is **not** in the repository (it is git-ignored): put your own file in the
-project root before `npx expo prebuild`. Everything goes through `src/lib/notifications.ts`:
+Wellness uses **local notifications only**: no push server, no Firebase, no Google Play
+services. That keeps the app private and eligible for F-Droid.
 
-- `NotificationProvider` — the interface the app uses (permission, token, messages).
-- `firebaseProvider` (`src/lib/firebaseMessaging.ts`) — the FCM implementation, installed in
-  `app/_layout.tsx`. `noopProvider` remains available for forks that drop Firebase.
-- `initNotifications()` — called from `app/_layout.tsx`; registers only if the user enabled
-  notifications in settings (`settings.notifications.enabled`) and a real provider is set.
-- `settings.notifications` — `enabled`, `waterReminders`, `weighInReminder` (persisted, included
-  in backups). `meta.pushToken` stores the current device token.
+- Delivery: the local Expo module `modules/wellness-native` (`Reminders.kt`) shows a
+  notification directly or schedules it with an inexact `AlarmManager` alarm (no exact-alarm
+  permission; Android may deliver it a few minutes late).
+- JS API: `src/lib/notifications.ts` — `showNotification`, `scheduleAt`, `cancelScheduled`,
+  `requestNotificationPermission`.
+- Everything is opt-in in Settings → Notifications.
 
-## Setting up FCM for your own build
+Current uses:
 
-1. Create a Firebase project and an Android app with package `io.github.timmylich.wellness`.
-   Download `google-services.json` to the project root. **Do not commit it** if the repository
-   is public with your own project — add it to `.gitignore` and provide it in CI as a secret.
-2. Install the libraries:
-   ```bash
-   npx expo install @react-native-firebase/app @react-native-firebase/messaging expo-build-properties
-   ```
-3. In `app.json`:
-   ```json
-   "android": { "googleServicesFile": "./google-services.json" },
-   "plugins": ["@react-native-firebase/app", "@react-native-firebase/messaging"]
-   ```
-   and add `"android.permission.POST_NOTIFICATIONS"` to `android.permissions`.
-4. In `src/lib/notifications.ts`, uncomment the `firebaseProvider` sketch.
-5. In `src/app/_layout.tsx`, call `setNotificationProvider(firebaseProvider)` before
-   `initNotifications()`.
-6. For background/quit-state messages, register
-   `messaging().setBackgroundMessageHandler(...)` at module scope (e.g. in
-   `src/lib/backgroundSteps.ts`'s neighbour file imported from `_layout.tsx`).
-7. `npx expo prebuild --clean` and rebuild.
+| Feature | When |
+| --- | --- |
+| Pantry expiry | 10:00 the day before a product expires (`src/sections/Pantry.tsx`) |
+| App update | Once per new version found on GitHub Releases, checked at most daily (`src/lib/updates.ts`) |
 
-## Privacy rules
+The step counter's foreground service (`StepService.kt`) also shows a silent, minimum-priority
+notification while it runs; Android requires it for any long-running background work.
 
-- Push is strictly opt-in.
-- Never put health data in push payloads or send it to the server. Reminders that depend on
-  data (e.g. "you drank only 1 L today") should be computed on the device and shown as local
-  notifications; the server may only send generic triggers.
-- Document any server component in the README and About screen.
+## Why not Firebase or Supabase push?
+
+Server push needs a server that knows each device and decides when to send. Nothing in the
+app needs that: reminders depend on data that only exists on the phone, and update checks can
+ask GitHub directly. Firebase Cloud Messaging also requires Google Play services, which F-Droid
+does not accept.
+
+If server push is ever needed (for example, announcements), the open option compatible with
+F-Droid is [UnifiedPush](https://unifiedpush.org): the user picks a distributor app (ntfy,
+NextPush…), and a small server (Supabase Edge Function, Cloudflare Worker…) posts to the
+endpoint the app registers. Keep it optional and never send health data.

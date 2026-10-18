@@ -13,8 +13,7 @@ import { BASELINE_STEPS, stepsKcal } from '../lib/calc';
 import { lastDays, shortLabel, timeLabel, todayKey } from '../lib/date';
 import { hcSyncSteps } from '../lib/healthConnect';
 import { useTheme } from '../lib/theme';
-import { removeWorkout, updateSettings } from '../store/actions';
-import { openAutostartSettings } from '../lib/battery';
+import { removeWorkout } from '../store/actions';
 import { useStore } from '../store/store';
 import type { WorkoutTemplate } from '../store/types';
 
@@ -30,7 +29,6 @@ export function Activity() {
   const weight = useStore((s) => s.profile.weightKg);
   const stepGoal = useStore((s) => s.settings.stepGoal);
   const source = useStore((s) => s.settings.stepsSource);
-  const infoDismissed = useStore((s) => s.settings.stepsInfoDismissed);
   const allSteps = useStore((s) => s.steps);
   const allWorkouts = useStore((s) => s.workouts);
   const steps = allSteps[date] ?? 0;
@@ -46,20 +44,6 @@ export function Activity() {
   return (
     <>
       <DateNav date={date} onChange={setDate} />
-
-      {!infoDismissed && (
-        <Card style={{ borderColor: c.accent }}>
-          <H icon="info">{L.activity.info.title}</H>
-          {(source === 'device' ? L.activity.info.device : L.activity.info.hc).map((p, i) => (
-            <T key={i} size={14}>{p}</T>
-          ))}
-          <Row>
-            {source === 'device' && <Button title={L.activity.info.battery} icon="battery" kind="secondary" onPress={openAutostartSettings} />}
-            <Button title={L.activity.info.configure} kind="secondary" onPress={() => router.push('/settings/steps')} />
-            <Button title={L.activity.info.ok} onPress={() => updateSettings({ stepsInfoDismissed: true })} />
-          </Row>
-        </Card>
-      )}
 
       <Card>
         <H icon="activity" right={<Tap onPress={() => setSheet({ kind: 'steps' })}><T color={c.accent}>{L.common.edit}</T></Tap>}>

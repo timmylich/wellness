@@ -19,7 +19,6 @@ export function Summary({ onOpen }: { onOpen: (s: SectionId) => void }) {
   const c = useTheme();
   const L = useT();
   const today = todayKey();
-  const name = useStore((s) => s.profile.name);
   const sections = useStore((s) => s.settings.sections);
   const stepGoal = useStore((s) => s.settings.stepGoal);
   const steps = useStore((s) => s.steps[today] ?? 0);
@@ -45,8 +44,6 @@ export function Summary({ onOpen }: { onOpen: (s: SectionId) => void }) {
 
   return (
     <>
-      <T size={24} bold>{L.greeting(new Date().getHours(), name)}</T>
-
       {sections.nutrition && (
         <Tap scaleTo={0.98} onPress={() => onOpen('nutrition')}>
           <Card>
@@ -84,19 +81,32 @@ export function Summary({ onOpen }: { onOpen: (s: SectionId) => void }) {
             </Ring>
             <View style={{ flex: 1, gap: 8 }}>
               <T dim size={13}>{L.summary.waterGoal(water.range.target / 1000)}</T>
-              <Tap
-                onPress={() => {
-                  addWater(waterMl);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                }}
-                accessibilityLabel={L.water.addLabel(waterMl)}
-                style={{ borderRadius: 18, paddingVertical: 16, alignItems: 'center', backgroundColor: c.water }}
-              >
-                <Row gap={6} style={{ flexWrap: 'nowrap' }}>
-                  <Icon name="water" size={20} color="#fff" />
-                  <T size={18} bold color="#fff">+ {fmt(waterMl)} {L.units.ml}</T>
-                </Row>
-              </Tap>
+              {/* Big button: plain water. Small one: other drinks (count towards the danger limit only). */}
+              <Row gap={8} style={{ flexWrap: 'nowrap', alignItems: 'stretch' }}>
+                <Tap
+                  onPress={() => {
+                    addWater(waterMl);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  }}
+                  accessibilityLabel={L.water.addLabel(waterMl)}
+                  style={{ flex: 1, borderRadius: 18, paddingVertical: 16, alignItems: 'center', backgroundColor: c.water }}
+                >
+                  <Row gap={6} style={{ flexWrap: 'nowrap' }}>
+                    <Icon name="water" size={20} color="#fff" />
+                    <T size={18} bold color="#fff">+ {fmt(waterMl)} {L.units.ml}</T>
+                  </Row>
+                </Tap>
+                <Tap
+                  onPress={() => {
+                    addWater(waterMl, todayKey(), 'other');
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  }}
+                  accessibilityLabel={`${L.water.kinds.other}: ${L.water.addLabel(waterMl)}`}
+                  style={{ width: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(c.high, 0.18) }}
+                >
+                  <Icon name="drink" size={22} color={c.high} />
+                </Tap>
+              </Row>
             </View>
           </Row>
         </Card>
