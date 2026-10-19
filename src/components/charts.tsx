@@ -116,11 +116,11 @@ function useScrub(xToIndex: (x: number) => number) {
   return { index: fingerX == null ? null : xToIndex(fingerX), handlers };
 }
 
-/** Value bubble shown above a selected point. */
-/** Value bubble (Google Fit style): a light pill with a pointer, above the selected point. */
+/** Value bubble above the selected point: a dark pill with a pointer in both themes. */
 function Tip({ x, y, width, label, value, color }: { x: number; y: number; width: number; label: string; value: string; color: string }) {
   const t = useTheme();
-  const bg = t.dark ? '#F4F6F5' : '#1F2427';
+  const bg = t.dark ? t.cardAlt : '#1F2427';
+  const edge = t.dark ? t.border : bg;
   const w = 150;
   const h = 32;
   const left = Math.max(0, Math.min(width - w, x - w / 2));
@@ -128,11 +128,11 @@ function Tip({ x, y, width, label, value, color }: { x: number; y: number; width
   const top = Math.max(0, y - h - 14);
   return (
     <View pointerEvents="none" style={{ position: 'absolute', top, left, width: w, alignItems: 'center' }}>
-      <View style={{ height: h, paddingHorizontal: 12, borderRadius: h / 2, backgroundColor: bg, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 3 }}>
+      <View style={{ height: h, paddingHorizontal: 12, borderRadius: h / 2, backgroundColor: bg, borderWidth: 1, borderColor: edge, flexDirection: 'row', alignItems: 'center', gap: 6, elevation: 3 }}>
         <T size={13} bold color={color}>{value}</T>
-        <T size={12} color={t.dark ? '#5F6B70' : '#AEB8BC'} numberOfLines={1}>{label}</T>
+        <T size={12} color={t.dark ? t.textDim : '#AEB8BC'} numberOfLines={1}>{label}</T>
       </View>
-      <View style={{ position: 'absolute', top: h - 5, left: Math.max(10, Math.min(w - 20, x - left - 5)), width: 10, height: 10, backgroundColor: bg, transform: [{ rotate: '45deg' }] }} />
+      <View style={{ position: 'absolute', top: h - 5, left: Math.max(10, Math.min(w - 20, x - left - 5)), width: 10, height: 10, backgroundColor: bg, borderRightWidth: 1, borderBottomWidth: 1, borderColor: edge, transform: [{ rotate: '45deg' }] }} />
     </View>
   );
 }

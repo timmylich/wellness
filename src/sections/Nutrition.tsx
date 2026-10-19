@@ -8,7 +8,6 @@ import { Animated, ScrollView, useWindowDimensions, View, type NativeScrollEvent
 
 import { AmountSheet } from '../components/AmountSheet';
 import { NutrientSheet } from '../components/NutrientSheet';
-import { usePagerLockHandlers } from '../components/PagerLock';
 import { BarChart, LineChart, RangeBar, Ring } from '../components/charts';
 import { NestedScrollHost } from '../../modules/wellness-native';
 import { Appear } from '../components/Appear';
@@ -67,7 +66,6 @@ export function Nutrition() {
   // The date label animates immediately; the heavy day data follows a frame later.
   const date = useDeferredValue(navDate);
   const [editing, setEditing] = useState<FoodEntry | null>(null);
-  const lockHandlers = usePagerLockHandlers();
   const [detail, setDetail] = useState<NutrientKey | null>(null);
   const [period, setPeriod] = useState<7 | 30>(7);
   const [chartKey, setChartKey] = useState<NutrientKey>('kcal');
@@ -164,7 +162,7 @@ export function Nutrition() {
       body: (
         <>
           <Segmented value={period} onChange={setPeriod} options={[{ value: 7, label: L.common.days7 }, { value: 30, label: L.common.days30 }]} />
-          <NestedScrollHost mode="horizontal" {...lockHandlers}>
+          <NestedScrollHost mode="horizontal">
           <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ gap: 6 }}>
             {NUTRIENT_KEYS.map((k) => (
               <Chip key={k} label={L.nutrients[k].short} active={chartKey === k} onPress={() => setChartKey(k)} />
@@ -276,7 +274,6 @@ function StatCarousel({ pages, maxH }: { pages: { title: string; body: React.Rea
     return { set: (p: number) => (page = p), get: () => page };
   });
   const c = useTheme();
-  const lockHandlers = usePagerLockHandlers();
   const [page, setPage] = useState(0);
   const [pageW, setPageW] = useState(0);
   const [pageHeights, setPageHeights] = useState<number[]>([]);
@@ -311,7 +308,7 @@ function StatCarousel({ pages, maxH }: { pages: { title: string; body: React.Rea
 
   return (
       <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
-        <NestedScrollHost mode="horizontal" onLayout={(e) => setPageW(e.nativeEvent.layout.width)} {...lockHandlers}>
+        <NestedScrollHost mode="horizontal" onLayout={(e) => setPageW(e.nativeEvent.layout.width)}>
           <Animated.ScrollView
             ref={scrollRef}
             horizontal

@@ -3,13 +3,13 @@
     "name": "Wellness",
     "slug": "wellness",
     "scheme": "wellness",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "io.github.timmylich.wellness",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "backgroundColor": "#2E9E6A",
         "foregroundImage": "./assets/android-icon-foreground.png",

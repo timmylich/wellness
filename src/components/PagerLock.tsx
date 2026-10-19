@@ -1,17 +1,8 @@
 /**
- * Lets a nested horizontal carousel temporarily disable the overview's section pager, so a
- * sideways swipe moves the carousel instead of switching sections.
+ * Lets a chart being scrubbed temporarily disable the overview's section pager. Carousels don't
+ * need it: NestedScrollHost keeps their sideways drags (and hands edge swipes to the pager).
  */
-import { createContext, useContext } from 'react';
+import { createContext } from 'react';
 
 export const PagerLock = createContext<(locked: boolean) => void>(() => {});
 
-/** Touch handlers to spread on the carousel's wrapper View. */
-export function usePagerLockHandlers() {
-  const setLocked = useContext(PagerLock);
-  return {
-    onTouchStart: () => setLocked(true),
-    onTouchEnd: () => setLocked(false),
-    onTouchCancel: () => setLocked(false),
-  };
-}

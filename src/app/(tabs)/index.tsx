@@ -4,7 +4,7 @@
  */
 import { router } from 'expo-router';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -58,8 +58,15 @@ const SectionContent = memo(function SectionContent({ tab, onOpen }: { tab: Tab;
 });
 
 const AnimatedPager = Animated.createAnimatedComponent(PagerView);
-/** First width is set without animation (module-level: one section bar per app). */
-const bgAnimInit = { done: false };
+/** A tap on a distant tab: the bar goes straight from `from` to `to` while `p` runs 0 → 1. */
+type Jump = { from: number; to: number; p: Animated.Value };
+const JUMP_MS = 300;
+
+/** Solid colour of `hex` at opacity `a` over `under` (both #rrggbb). */
+function mix(hex: string, under: string, a: number): string {
+  const ch = (h: string, i: number) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
+  return '#' + [0, 1, 2].map((i) => Math.round(ch(hex, i) * a + ch(under, i) * (1 - a)).toString(16).padStart(2, '0')).join('');
+}
 
 const BAR_PAD = 4;
 const TAB_BASE = 44; // horizontal padding 12 + icon 20 + padding 12
@@ -81,12 +88,12 @@ const BAR_H = TAB_H + BAR_PAD * 2;
 function SectionBar({
   tabs,
   progress,
-  index,
+  jump,
   onSelect,
 }: {
   tabs: typeof TABS;
   progress: Animated.AnimatedInterpolation<number>;
-  index: number;
+  jump: Jump | null;
   onSelect: (t: Tab) => void;
 }) {
   const c = useTheme();
@@ -103,24 +110,32 @@ function SectionBar({
   const W = (k: number) => (compact ? 0 : LABEL_GAP + (labelW[tabs[k].id] ?? 0));
   // x of tab i while page k is active: tabs after k are pushed right by k's label.
   const xAt = (i: number, k: number) => BAR_PAD + i * (TAB_BASE + TAB_GAP) + (i > k ? W(k) : 0);
+  // Value f(k) for the active page k, following the swipe, or the tap jump (which skips the
+  // tabs in between instead of sliding over each of them).
   const along = (f: (k: number) => number) =>
-    n > 1 ? progress.interpolate({ inputRange: pages, outputRange: pages.map(f), extrapolate: 'clamp' }) : f(0);
+    jump
+      ? jump.p.interpolate({ inputRange: [0, 1], outputRange: [f(jump.from), f(jump.to)] })
+      : n > 1
+        ? progress.interpolate({ inputRange: pages, outputRange: pages.map(f), extrapolate: 'clamp' })
+        : f(0);
+  const labelOpacity = (i: number) =>
+    jump
+      ? jump.p.interpolate({ inputRange: [0, 0.4, 0.6, 1], outputRange: i === jump.from ? [1, 0, 0, 0] : i === jump.to ? [0, 0, 0, 1] : [0, 0, 0, 0] })
+      : n > 1
+        ? progress.interpolate({ inputRange: [i - 1, i - 0.4, i, i + 0.4, i + 1], outputRange: [0, 0, 1, 0, 0], extrapolate: 'clamp' })
+        : 1;
   const maxLabel = Math.max(0, ...tabs.map((_, k) => W(k)));
   const totalW = BAR_PAD * 2 + n * TAB_BASE + (n - 1) * TAB_GAP + maxLabel;
   const pillX = along((k) => xAt(k, k));
   const pillW = (k: number) => TAB_BASE + W(k);
-  // Blurred background: a rounded rectangle as wide as the visible tabs. Its width springs to
-  // the selected tab (a layout property, so it cannot follow the swipe on the native thread).
-  const bgW = iconsW + W(Math.min(index, n - 1));
-  const motion = useMotion();
-  const [bgAnim] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    if (!ready) return;
-    if (!motion || bgAnimInit.done !== true) {
-      bgAnim.setValue(bgW);
-      bgAnimInit.done = true;
-    } else Animated.timing(bgAnim, { toValue: bgW, duration: dur(160), easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [bgW, ready, motion, bgAnim]);
+  // Bar background, as wide as the visible tabs and centred. Built like the pill (two circles
+  // plus a 1 px middle stretched by scaleX), so its width follows the swipe on the native thread.
+  const bgW = (k: number) => iconsW + W(k);
+  const bgLeft = along((k) => (totalW - bgW(k)) / 2);
+  const bgRight = along((k) => (totalW + bgW(k)) / 2);
+  const bgMid = totalW / 2 - 0.5;
+  const bgSpan = along((k) => bgW(k) - BAR_H + 2);
+  const pill = mix(c.accent, c.card, 0.16);
 
   return (
     <View pointerEvents="box-none" style={{ flexGrow: 0, flexShrink: 0 }}>
@@ -142,32 +157,39 @@ function SectionBar({
       <View pointerEvents="box-none" style={{ alignItems: 'center', paddingHorizontal: 12 }}>
         {ready && (
           <View style={{ width: totalW, height: TAB_H + BAR_PAD * 2 }}>
-            <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: BAR_H, alignItems: 'center' }}>
-              {/* Solid, slightly translucent pill (Android blur is unreliable over a native pager). */}
-              <Animated.View style={{ width: bgAnim, height: BAR_H, borderRadius: BAR_H / 2, backgroundColor: alpha(c.card, 0.94), borderWidth: 1, borderColor: alpha(c.border, 0.8) }} />
+            {/* Bar background: solid border-coloured shape, then the card-coloured shape 1 px
+                inside it. Only solid colours, so overlapping pieces never show seams. */}
+            <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: BAR_H }}>
+              {[0, 1].map((inset) => {
+                const color = inset ? c.card : c.border;
+                const d = BAR_H - 2 * inset;
+                return [
+                  <Animated.View key={`l${inset}`} style={{ position: 'absolute', top: inset, left: 0, width: d, height: d, borderRadius: d / 2, backgroundColor: color, transform: [{ translateX: Animated.add(bgLeft, inset) }] }} />,
+                  <Animated.View key={`r${inset}`} style={{ position: 'absolute', top: inset, left: 0, width: d, height: d, borderRadius: d / 2, backgroundColor: color, transform: [{ translateX: Animated.add(bgRight, inset - BAR_H) }] }} />,
+                  <Animated.View
+                    key={`m${inset}`}
+                    style={{ position: 'absolute', top: inset, left: 0, width: 1, height: d, backgroundColor: color, transform: [{ translateX: bgMid }, { scaleX: bgSpan }] }}
+                  />,
+                ];
+              })}
             </View>
             {/* Shift everything so the visible tabs stay centred whatever label is open. */}
             <Animated.View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: totalW, transform: [{ translateX: along((k) => (maxLabel - W(k)) / 2) }] }}>
             {n > 1 && (
-              // Solid pieces composited as one layer, then faded: overlaps never look darker.
-              <View
-                pointerEvents="none"
-                needsOffscreenAlphaCompositing
-                renderToHardwareTextureAndroid
-                style={{ position: 'absolute', left: 0, right: 0, top: BAR_PAD, height: TAB_H, opacity: 0.16 }}
-              >
+              // Solid colour (accent blended over the card), so overlaps never look darker.
+              <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: BAR_PAD, height: TAB_H }}>
                 {/* Left cap, stretched middle (1 px scaled), right cap. */}
-                <Animated.View style={{ position: 'absolute', width: TAB_H, height: TAB_H, borderRadius: R, backgroundColor: c.accent, transform: [{ translateX: pillX }] }} />
+                <Animated.View style={{ position: 'absolute', width: TAB_H, height: TAB_H, borderRadius: R, backgroundColor: pill, transform: [{ translateX: pillX }] }} />
                 <Animated.View
                   style={{
                     position: 'absolute',
                     width: 1,
                     height: TAB_H,
-                    backgroundColor: c.accent,
+                    backgroundColor: pill,
                     transform: [{ translateX: along((k) => xAt(k, k) + pillW(k) / 2 - 0.5) }, { scaleX: along((k) => pillW(k) - TAB_H - 2) }],
                   }}
                 />
-                <Animated.View style={{ position: 'absolute', width: TAB_H, height: TAB_H, borderRadius: R, backgroundColor: c.accent, transform: [{ translateX: along((k) => xAt(k, k) + pillW(k) - TAB_H) }] }} />
+                <Animated.View style={{ position: 'absolute', width: TAB_H, height: TAB_H, borderRadius: R, backgroundColor: pill, transform: [{ translateX: along((k) => xAt(k, k) + pillW(k) - TAB_H) }] }} />
               </View>
             )}
             {tabs.map((t, i) => (
@@ -183,7 +205,7 @@ function SectionBar({
                     style={{
                       marginLeft: LABEL_GAP,
                       // Fade quickly so a fading label never overlaps the next icon.
-                      opacity: n > 1 ? progress.interpolate({ inputRange: [i - 1, i - 0.4, i, i + 0.4, i + 1], outputRange: [0, 0, 1, 0, 0], extrapolate: 'clamp' }) : 1,
+                      opacity: labelOpacity(i),
                     }}
                   >
                     <T bold size={14} color={c.accent} numberOfLines={1} style={{ width: labelW[t.id] }}>
@@ -305,7 +327,6 @@ export default function Overview() {
   const sections = useStore((s) => s.settings.sections);
   const [tab, setTab] = useState<Tab>('summary');
   // Sections render lazily: only those the user has visited (or is next to).
-  const [near, setNear] = useState(0);
   const [visited, setVisited] = useState<Set<Tab>>(() => new Set(['summary']));
   const [adding, setAdding] = useState<Exclude<AddKind, 'food'> | null>(null);
   const [workoutTpl, setWorkoutTpl] = useState<WorkoutTemplate | null | undefined>(undefined);
@@ -313,6 +334,8 @@ export default function Overview() {
   const [offset] = useState(() => new Animated.Value(0));
   const [progress] = useState(() => Animated.add(position, offset));
   const pager = useRef<PagerView>(null);
+  const [jump, setJump] = useState<Jump | null>(null);
+  const jumpRef = useRef<Jump | null>(null);
 
   const tabs = TABS.filter((t) => t.id === 'summary' || sections[t.id]);
   const index = Math.max(0, tabs.findIndex((t) => t.id === tab));
@@ -326,24 +349,39 @@ export default function Overview() {
 
   const select = (t: Tab) => {
     const i = tabs.findIndex((x) => x.id === t);
-    if (i < 0) return;
+    if (i < 0 || i === index) return;
     mount([t]);
     setTab(t);
-    if (motion) pager.current?.setPage(i);
-    else pager.current?.setPageWithoutAnimation(i);
+    if (!motion) return pager.current?.setPageWithoutAnimation(i);
+    if (Math.abs(i - index) < 2) return pager.current?.setPage(i);
+    // Distant tab: switch the page at once (the pages in between are never shown or mounted)
+    // and fade it in, while the bar highlight glides straight to the target.
+    const j: Jump = { from: index, to: i, p: new Animated.Value(0) };
+    jumpRef.current = j;
+    setJump(j);
+    pager.current?.setPageWithoutAnimation(i);
+    Animated.timing(j.p, { toValue: 1, duration: dur(JUMP_MS), easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(endJump);
   };
+  // Back to following the pager once the jump animation is over.
+  function endJump() {
+    if (!jumpRef.current) return;
+    jumpRef.current = null;
+    setJump(null);
+  }
   // Stable callback for the memoised sections.
   const selectRef = useRef(select);
   useEffect(() => {
     selectRef.current = select;
   });
   const onOpen = useCallback((t: Tab) => selectRef.current(t), []);
-  // Pre-mount the first neighbour shortly after launch, so the first swipe is not blank.
+  // Once idle, mount the remaining sections one at a time (first the neighbours), so later
+  // switches never stall the transition while a heavy section renders.
+  const pending = [tabs[index + 1], tabs[index - 1], ...tabs].find((t) => t && !visited.has(t.id))?.id;
   useEffect(() => {
-    const id = setTimeout(() => mount([tabs[index + 1]?.id, tabs[index - 1]?.id]), 600);
+    if (!pending || jump) return;
+    const id = setTimeout(() => mount([pending]), visited.size <= 1 ? 600 : 350);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pending, jump, visited.size]);
   // A nested carousel disables paging imperatively while touched (no re-render).
   const setLocked = useCallback((locked: boolean) => pager.current?.setScrollEnabled(!locked), []);
 
@@ -362,27 +400,21 @@ export default function Overview() {
         style={{ flex: 1 }}
         initialPage={index}
         offscreenPageLimit={1}
-        onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], {
-          useNativeDriver: true,
-          // The bar background starts resizing as soon as the swipe passes the middle.
-          listener: (e: { nativeEvent: { position: number; offset: number } }) => {
-            const i = Math.round(e.nativeEvent.position + e.nativeEvent.offset);
-            if (i !== near) setNear(i);
-          },
-        })}
+        onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], { useNativeDriver: true })}
         onPageSelected={(e) => {
           const i = e.nativeEvent.position;
           if (tabs[i] && tabs[i].id !== tab) setTab(tabs[i].id);
           mount([tabs[i]?.id]);
         }}
         onPageScrollStateChanged={(e) => {
-          // Mount neighbours only once the pager is at rest, so a swipe never stalls on a mount.
-          if (e.nativeEvent.pageScrollState === 'idle') mount([tabs[index - 1]?.id, tabs[index + 1]?.id]);
+          // A drag interrupts a jump.
+          if (e.nativeEvent.pageScrollState === 'dragging') endJump();
         }}
       >
-        {tabs.map((t) => (
-          <ScrollView
+        {tabs.map((t, i) => (
+          <Animated.ScrollView
             key={t.id}
+            style={jump?.to === i ? { opacity: jump.p.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] }) } : undefined}
             contentContainerStyle={{ padding: 16, paddingTop: insets.top + BAR_TOTAL + 12, paddingBottom: 120, gap: 12 }}
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
@@ -393,12 +425,12 @@ export default function Overview() {
                 <SectionContent tab={t.id} onOpen={onOpen} />
               </PagerLock.Provider>
             ) : null}
-          </ScrollView>
+          </Animated.ScrollView>
         ))}
       </AnimatedPager>
       {/* Floating section bar: pages scroll under it; only the tabs themselves have a background. */}
       <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, top: insets.top + 8 }}>
-        <SectionBar tabs={tabs} progress={progress} index={near} onSelect={select} />
+        <SectionBar tabs={tabs} progress={progress} jump={jump} onSelect={select} />
       </View>
 
       {addItems.length > 0 && <FabMenu items={addItems} onPick={pick} />}

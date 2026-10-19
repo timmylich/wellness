@@ -1,5 +1,5 @@
 # Builds a signed release APK and publishes a GitHub Release when a version tag is pushed:
-#   git tag v0.5.0 && git push origin v0.5.0
+#   git tag v0.5.1 && git push origin v0.5.1
 # Release notes are taken from the matching section of CHANGELOG.md.
 # Required repository secrets (see docs/releasing.md):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD

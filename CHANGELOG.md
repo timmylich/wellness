@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-19
+
 ### Added
 - Health tab: doctor visits, lab tests and other records with photos (stored privately on the
   phone).
@@ -53,6 +55,14 @@ uses [Semantic Versioning](https://semver.org/).
 - Food packs are explained in plain words, with alternatives.
 
 ### Fixed
+- Section bar: the background resizes smoothly with the swipe; no more stray stripes at its
+  edges.
+- Tapping a distant section or bottom tab switches straight to it, without showing (and
+  loading) the tabs in between; the highlight glides directly to the target.
+- Food cards: a swipe past the first or last card turns the section page.
+- Chart value bubble is dark in the dark theme.
+- Remaining sections are pre-rendered in the background once the app is idle, so switching
+  to them never stalls.
 - Notification icon was a blank square.
 - Bottom sheets paused for a few frames after a swipe-down release.
 - Food amount sheet closed without animation (backdrop tap, released drag).

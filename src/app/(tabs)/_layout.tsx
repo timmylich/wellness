@@ -6,13 +6,14 @@
  */
 import { Redirect } from 'expo-router';
 import { TopTabs, type MaterialTopTabBarProps } from 'expo-router/js-top-tabs';
-import { Animated, Pressable, View, useWindowDimensions } from 'react-native';
+import { useState } from 'react';
+import { Animated, Easing, Pressable, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '../../components/Icon';
 import { T } from '../../components/ui';
 import { useT } from '../../i18n';
-import { useMotion } from '../../lib/motion';
+import { dur, useMotion } from '../../lib/motion';
 import { alpha, useTheme } from '../../lib/theme';
 import { useStore } from '../../store/store';
 
@@ -20,17 +21,45 @@ const ICONS: Record<string, IconName> = { tips: 'tips', pantry: 'pantry', index:
 const BAR_H = 66;
 const PILL_W = 56;
 const PILL_H = 32;
+const JUMP_MS = 300;
 
-function BottomBar({ state, descriptors, navigation, position }: MaterialTopTabBarProps) {
+/** A tap on a distant tab: the highlight goes straight from `from` to `to` while `p` runs 0 → 1. */
+type Jump = { from: number; to: number; p: Animated.Value };
+
+function BottomBar({ state, descriptors, navigation, position, setInstant }: MaterialTopTabBarProps & { setInstant: (on: boolean) => void }) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const routes: { key: string; name: string }[] = state.routes;
   const n = routes.length;
   const slot = width / n;
+  const motion = useMotion();
+  const [jump, setJump] = useState<Jump | null>(null);
   const inputRange = routes.map((_, i) => i);
-  // Highlight follows the pager position (swipes and taps) without JS work per frame.
-  const pillX = n > 1 ? position.interpolate({ inputRange, outputRange: inputRange.map((i) => i * slot + (slot - PILL_W) / 2) }) : (slot - PILL_W) / 2;
+  // Highlight follows the pager position (swipes and taps) without JS work per frame; on a
+  // distant jump it moves straight to the target instead of stopping at every tab between.
+  const along = (f: (i: number) => number, clamp?: boolean) =>
+    jump
+      ? jump.p.interpolate({ inputRange: [0, 1], outputRange: [f(jump.from), f(jump.to)] })
+      : n > 1
+        ? position.interpolate({ inputRange, outputRange: inputRange.map(f), extrapolate: clamp ? 'clamp' : 'extend' })
+        : f(0);
+  const pillX = along((i) => i * slot + (slot - PILL_W) / 2);
+
+  const go = (i: number) => {
+    const from = state.index;
+    if (!motion || Math.abs(i - from) < 2) return navigation.navigate(routes[i].name);
+    // Distant tab: switch the page at once (batched with `instant`, so the pager skips its
+    // slide and the tabs in between are never shown or mounted); the highlight glides there.
+    const j: Jump = { from, to: i, p: new Animated.Value(0) };
+    setJump(j);
+    setInstant(true);
+    navigation.navigate(routes[i].name);
+    Animated.timing(j.p, { toValue: 1, duration: dur(JUMP_MS), easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => {
+      setInstant(false);
+      setJump((cur) => (cur === j ? null : cur));
+    });
+  };
   return (
     <View style={{ height: BAR_H + insets.bottom, paddingBottom: insets.bottom, backgroundColor: c.card, borderTopWidth: 1, borderTopColor: c.border }}>
       <Animated.View
@@ -41,7 +70,7 @@ function BottomBar({ state, descriptors, navigation, position }: MaterialTopTabB
         {routes.map((r, i) => {
           const focused = state.index === i;
           const title = descriptors[r.key].options.title ?? r.name;
-          const opacity = n > 1 ? position.interpolate({ inputRange: [i - 1, i, i + 1], outputRange: [0.55, 1, 0.55], extrapolate: 'clamp' }) : 1;
+          const opacity = along((k) => (k === i ? 1 : 0.55), true);
           return (
             <Pressable
               key={r.key}
@@ -49,7 +78,7 @@ function BottomBar({ state, descriptors, navigation, position }: MaterialTopTabB
               accessibilityState={{ selected: focused }}
               onPress={() => {
                 const e = navigation.emit({ type: 'tabPress', target: r.key, canPreventDefault: true });
-                if (!focused && !e.defaultPrevented) navigation.navigate(r.name);
+                if (!focused && !e.defaultPrevented) go(i);
               }}
               style={{ flex: 1, alignItems: 'center', paddingTop: 8 }}
             >
@@ -74,6 +103,8 @@ export default function TabsLayout() {
   const motion = useMotion();
   const insets = useSafeAreaInsets();
   const onboarded = useStore((s) => s.meta.onboarded);
+  // True for the duration of a distant tab jump: the pager switches without sliding.
+  const [instant, setInstant] = useState(false);
   const sections = useStore((s) => s.settings.sections);
   // First launch: collect the profile before showing anything else.
   if (!onboarded) return <Redirect href="/onboarding" />;
@@ -82,9 +113,9 @@ export default function TabsLayout() {
     <TopTabs
       initialRouteName="index"
       tabBarPosition="bottom"
-      tabBar={(props: MaterialTopTabBarProps) => <BottomBar {...props} />}
+      tabBar={(props: MaterialTopTabBarProps) => <BottomBar {...props} setInstant={setInstant} />}
       screenOptions={{
-        animationEnabled: motion,
+        animationEnabled: motion && !instant,
         lazy: true,
         sceneStyle: page,
       }}
