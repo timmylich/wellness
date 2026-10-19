@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 
 import { LineChart } from '../components/charts';
+import { BodyEditSheet, useEntrySheet } from '../components/EntryEditor';
 import { BodyForm } from '../components/forms';
 import { Card, Empty, fmt, H, Hint, ListItem, Row, Stat, T } from '../components/ui';
 import { useT } from '../i18n';
@@ -10,12 +11,14 @@ import { humanDate, shortLabel } from '../lib/date';
 import { alpha, toneColor, useTheme } from '../lib/theme';
 import { removeBody } from '../store/actions';
 import { useStore } from '../store/store';
+import type { BodyEntry } from '../store/types';
 
 export function Body() {
   const c = useTheme();
   const L = useT();
   const profile = useStore((s) => s.profile);
   const entries = useStore((s) => s.body);
+  const editor = useEntrySheet<BodyEntry>();
 
   const sorted = useMemo(() => [...entries].sort((a, b) => a.time - b.time), [entries]);
   const last = <K extends 'waistCm' | 'neckCm' | 'hipCm' | 'bodyFatPct'>(k: K) => sorted.findLast((e) => e[k] != null)?.[k];
@@ -104,12 +107,15 @@ export function Body() {
                 e.heightCm && `${P.height} ${fmt(e.heightCm)}`,
               ].filter(Boolean).join(' · ')}
               subtitle={humanDate(e.date, L)}
+              onPress={() => editor.edit(e)}
               onDelete={() => removeBody(e.id)}
             />
           ))
         ) : (
           <Empty text={L.common.noRecords} />
         )}
+        {sorted.length ? <T dim size={12}>{L.common.longPressDelete}</T> : null}
+        <BodyEditSheet sheet={editor} />
       </Card>
     </>
   );

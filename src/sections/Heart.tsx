@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 
 import { LineChart } from '../components/charts';
+import { HeartEditSheet, useEntrySheet } from '../components/EntryEditor';
 import { HeartForm } from '../components/forms';
 import { Card, Empty, fmt, H, Hint, ListItem, Row, Segmented, Stat, T } from '../components/ui';
 import { useT } from '../i18n';
@@ -10,6 +11,7 @@ import { humanDate, shortLabel, timeLabel } from '../lib/date';
 import { alpha, toneColor, useTheme } from '../lib/theme';
 import { removeHeart } from '../store/actions';
 import { useStore } from '../store/store';
+import type { HeartEntry } from '../store/types';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
@@ -30,6 +32,7 @@ export function Heart() {
   const entries = useStore((s) => s.heart);
   const profile = useStore((s) => s.profile);
   const [count, setCount] = useState<14 | 30 | 90>(14);
+  const editor = useEntrySheet<HeartEntry>();
 
   const sorted = useMemo(() => [...entries].sort((a, b) => a.time - b.time), [entries]);
   const recent = sorted.slice(-count);
@@ -117,6 +120,7 @@ export function Heart() {
                 title={[e.systolic && e.diastolic ? `${e.systolic}/${e.diastolic}` : null, e.pulse ? `♥ ${e.pulse}` : null].filter(Boolean).join('   ')}
                 subtitle={`${humanDate(e.date, L)}, ${timeLabel(e.time)}${e.note ? ` · ${e.note}` : ''}`}
                 right={cat ? <T size={12} color={toneColor(c, cat.tone)}>{L.heart.bp[cat.key].label}</T> : null}
+                onPress={() => editor.edit(e)}
                 onDelete={() => removeHeart(e.id)}
               />
             );
@@ -124,6 +128,8 @@ export function Heart() {
         ) : (
           <Empty text={L.common.noRecords} />
         )}
+        {sorted.length ? <T dim size={12}>{L.common.longPressDelete}</T> : null}
+        <HeartEditSheet sheet={editor} />
       </Card>
       <Hint title={L.heart.urgentTitle} force>{L.heart.urgent}</Hint>
     </>

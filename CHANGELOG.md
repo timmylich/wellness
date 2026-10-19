@@ -9,6 +9,8 @@ uses [Semantic Versioning](https://semver.org/).
 ## [0.5.1] — 2026-10-19
 
 ### Added
+- Tap a weight, measurement, blood pressure, water or workout entry to edit all its values,
+  date and time.
 - Health tab: doctor visits, lab tests and other records with photos (stored privately on the
   phone).
 - Pantry moved to the bottom bar.
@@ -55,11 +57,13 @@ uses [Semantic Versioning](https://semver.org/).
 - Food packs are explained in plain words, with alternatives.
 
 ### Fixed
-- Section bar: the background resizes smoothly with the swipe; no more stray stripes at its
-  edges.
+- Section bar: the background resizes smoothly with the swipe; its edges and the highlight
+  are drawn cleanly (no rectangular overhangs).
 - Tapping a distant section or bottom tab switches straight to it, without showing (and
-  loading) the tabs in between; the highlight glides directly to the target.
-- Food cards: a swipe past the first or last card turns the section page.
+  loading) the tabs in between: the highlight glides directly to the target and the new page
+  slides in like a neighbour. The section highlight no longer snaps back to the old section.
+- Food cards: a swipe past the first or last card turns the section page; swipes in between
+  (also ones starting on a chart) stay in the cards.
 - Chart value bubble is dark in the dark theme.
 - Remaining sections are pre-rendered in the background once the app is idle, so switching
   to them never stalls.

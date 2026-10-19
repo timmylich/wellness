@@ -9,7 +9,7 @@ export const en: Dict = {
   common: {
     save: 'Save', cancel: 'Cancel', delete: 'Delete', add: 'Add', next: 'Next', back: 'Back',
     start: 'Start', done: 'Done', error: 'Error', yes: 'Yes', edit: 'edit', search: 'Search',
-    deleteEntry: 'Delete this entry?', longPressDelete: 'Long-press an entry to delete it', noData: 'No data yet',
+    deleteEntry: 'Delete this entry?', longPressDelete: 'Tap an entry to edit it, long-press to delete', editEntry: 'Edit entry', date: 'Date', time: 'Time', amount: 'Amount', noData: 'No data yet',
     noRecords: 'No entries yet', days7: '7 d', days30: '30 d', today: 'Today', average: 'Average',
     min: 'Minimum', target: 'Target', max: 'Maximum', danger: 'Dangerous', limit: 'Limit', optional: 'optional',
     disclaimer: 'Wellness is not a medical device. Recommendations follow general WHO guidelines and do not replace a doctor’s advice.',

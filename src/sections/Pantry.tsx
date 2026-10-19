@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, View } from 'react-native';
 
-import { Icon } from '../components/Icon';
+import { DateStep } from '../components/DateStep';
 import { Sheet } from '../components/Sheet';
 import { Slider } from '../components/Slider';
 import { Button, Card, Chip, Empty, Field, fmt, H, parseNum, Row, Segmented, T, Tap } from '../components/ui';
@@ -14,7 +14,7 @@ import { dur } from '../lib/motion';
 import { guessBase, SHELF_BASES, shelfBase } from '../data/shelfLife';
 import { useLang, useT } from '../i18n';
 import { foodTags } from '../lib/calc';
-import { addDays, humanDate, parseKey, todayKey } from '../lib/date';
+import { addDays, parseKey, todayKey } from '../lib/date';
 import { searchLocal } from '../lib/foodApi';
 import { cancelScheduled, scheduleAt } from '../lib/notifications';
 import { alpha, useTheme } from '../lib/theme';
@@ -183,25 +183,6 @@ function Countdown({ until }: { until: number }) {
     return () => clearInterval(t);
   }, [until]);
   return <T size={12} color={c.danger}>{L.pantry.removeIn(left)}</T>;
-}
-
-export function DateStep({ label, value, onChange }: { label: string; value: string; onChange: (d: string) => void }) {
-  const c = useTheme();
-  const L = useT();
-  return (
-    <View style={{ gap: 4 }}>
-      <T dim size={13}>{label}</T>
-      <Row style={{ flexWrap: 'nowrap' }}>
-        <Tap onPress={() => onChange(addDays(value, -1))} style={{ padding: 10, borderRadius: 12, backgroundColor: c.accentSoft }}>
-          <Icon name="minus" size={18} color={c.accent} />
-        </Tap>
-        <T bold center style={{ flex: 1 }}>{humanDate(value, L)}</T>
-        <Tap onPress={() => onChange(addDays(value, 1))} style={{ padding: 10, borderRadius: 12, backgroundColor: c.accentSoft }}>
-          <Icon name="plus" size={18} color={c.accent} />
-        </Tap>
-      </Row>
-    </View>
-  );
 }
 
 export function PantryForm({ item, onDone }: { item: PantryItem | null; onDone: () => void }) {

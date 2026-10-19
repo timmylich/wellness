@@ -6,7 +6,7 @@
  */
 import { Redirect } from 'expo-router';
 import { TopTabs, type MaterialTopTabBarProps } from 'expo-router/js-top-tabs';
-import { useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,10 +23,35 @@ const PILL_W = 56;
 const PILL_H = 32;
 const JUMP_MS = 300;
 
-/** A tap on a distant tab: the highlight goes straight from `from` to `to` while `p` runs 0 → 1. */
-type Jump = { from: number; to: number; p: Animated.Value };
+/**
+ * A tap on a distant tab. The pager switches without sliding (the tabs in between are never
+ * shown or mounted); instead the highlight goes straight from `from` to `to` and the new page
+ * slides in like a neighbour, while `p` runs 0 → 1.
+ */
+type Jump = { from: number; to: number; key: string; p: Animated.Value };
 
-function BottomBar({ state, descriptors, navigation, position, setInstant }: MaterialTopTabBarProps & { setInstant: (on: boolean) => void }) {
+const JumpContext = createContext<Jump | null>(null);
+
+/** Wraps every tab page; the target of a jump slides and fades in from the travel side. */
+function SceneLayout({ children, route }: { children: ReactNode; route: { key: string } }) {
+  const j = useContext(JumpContext);
+  const { width } = useWindowDimensions();
+  const on = j?.key === route.key;
+  // Always the same element type, so a page is never remounted by the wrapper.
+  return (
+    <Animated.View
+      style={{
+        flex: 1,
+        opacity: on ? j.p.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 1, 1] }) : 1,
+        transform: [{ translateX: on ? j.p.interpolate({ inputRange: [0, 1], outputRange: [(j.to > j.from ? 1 : -1) * width * 0.35, 0] }) : 0 }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+function BottomBar({ state, descriptors, navigation, position, jump, setJump }: MaterialTopTabBarProps & { jump: Jump | null; setJump: (j: Jump | null) => void }) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -34,7 +59,6 @@ function BottomBar({ state, descriptors, navigation, position, setInstant }: Mat
   const n = routes.length;
   const slot = width / n;
   const motion = useMotion();
-  const [jump, setJump] = useState<Jump | null>(null);
   const inputRange = routes.map((_, i) => i);
   // Highlight follows the pager position (swipes and taps) without JS work per frame; on a
   // distant jump it moves straight to the target instead of stopping at every tab between.
@@ -49,16 +73,9 @@ function BottomBar({ state, descriptors, navigation, position, setInstant }: Mat
   const go = (i: number) => {
     const from = state.index;
     if (!motion || Math.abs(i - from) < 2) return navigation.navigate(routes[i].name);
-    // Distant tab: switch the page at once (batched with `instant`, so the pager skips its
-    // slide and the tabs in between are never shown or mounted); the highlight glides there.
-    const j: Jump = { from, to: i, p: new Animated.Value(0) };
-    setJump(j);
-    setInstant(true);
+    // Distant tab: batched with the navigation, `jump` turns the pager's slide off for it.
+    setJump({ from, to: i, key: routes[i].key, p: new Animated.Value(0) });
     navigation.navigate(routes[i].name);
-    Animated.timing(j.p, { toValue: 1, duration: dur(JUMP_MS), easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => {
-      setInstant(false);
-      setJump((cur) => (cur === j ? null : cur));
-    });
   };
   return (
     <View style={{ height: BAR_H + insets.bottom, paddingBottom: insets.bottom, backgroundColor: c.card, borderTopWidth: 1, borderTopColor: c.border }}>
@@ -103,35 +120,48 @@ export default function TabsLayout() {
   const motion = useMotion();
   const insets = useSafeAreaInsets();
   const onboarded = useStore((s) => s.meta.onboarded);
-  // True for the duration of a distant tab jump: the pager switches without sliding.
-  const [instant, setInstant] = useState(false);
+  const [jump, setJump] = useState<Jump | null>(null);
+  // Run the jump once its first frame is on screen; started earlier, a slow first render of
+  // the new page could swallow the animation.
+  useEffect(() => {
+    if (!jump) return;
+    const anim = Animated.timing(jump.p, { toValue: 1, duration: dur(JUMP_MS), easing: Easing.out(Easing.cubic), useNativeDriver: true });
+    const raf = requestAnimationFrame(() => anim.start(({ finished }) => finished && setJump((cur) => (cur === jump ? null : cur))));
+    return () => {
+      cancelAnimationFrame(raf);
+      anim.stop();
+    };
+  }, [jump]);
   const sections = useStore((s) => s.settings.sections);
   // First launch: collect the profile before showing anything else.
   if (!onboarded) return <Redirect href="/onboarding" />;
   const page = { paddingTop: insets.top, backgroundColor: c.bg };
   return (
-    <TopTabs
-      initialRouteName="index"
-      tabBarPosition="bottom"
-      tabBar={(props: MaterialTopTabBarProps) => <BottomBar {...props} setInstant={setInstant} />}
-      screenOptions={{
-        animationEnabled: motion && !instant,
-        lazy: true,
-        sceneStyle: page,
-      }}
-    >
-      <TopTabs.Protected guard={sections.tips}>
-        <TopTabs.Screen name="tips" options={{ title: L.tabs.tips }} />
-      </TopTabs.Protected>
-      <TopTabs.Protected guard={sections.pantry}>
-        <TopTabs.Screen name="pantry" options={{ title: L.tabs.pantry }} />
-      </TopTabs.Protected>
-      {/* The section pager inside Overview owns horizontal swipes there. */}
-      <TopTabs.Screen name="index" options={{ title: L.tabs.overview, swipeEnabled: false, sceneStyle: { backgroundColor: c.bg } }} />
-      <TopTabs.Protected guard={sections.health}>
-        <TopTabs.Screen name="health" options={{ title: L.tabs.health }} />
-      </TopTabs.Protected>
-      <TopTabs.Screen name="more" options={{ title: L.tabs.more }} />
-    </TopTabs>
+    <JumpContext.Provider value={jump}>
+      <TopTabs
+        initialRouteName="index"
+        tabBarPosition="bottom"
+        tabBar={(props: MaterialTopTabBarProps) => <BottomBar {...props} jump={jump} setJump={setJump} />}
+        screenLayout={SceneLayout}
+        screenOptions={{
+          animationEnabled: motion && !jump,
+          lazy: true,
+          sceneStyle: page,
+        }}
+      >
+        <TopTabs.Protected guard={sections.tips}>
+          <TopTabs.Screen name="tips" options={{ title: L.tabs.tips }} />
+        </TopTabs.Protected>
+        <TopTabs.Protected guard={sections.pantry}>
+          <TopTabs.Screen name="pantry" options={{ title: L.tabs.pantry }} />
+        </TopTabs.Protected>
+        {/* The section pager inside Overview owns horizontal swipes there. */}
+        <TopTabs.Screen name="index" options={{ title: L.tabs.overview, swipeEnabled: false, sceneStyle: { backgroundColor: c.bg } }} />
+        <TopTabs.Protected guard={sections.health}>
+          <TopTabs.Screen name="health" options={{ title: L.tabs.health }} />
+        </TopTabs.Protected>
+        <TopTabs.Screen name="more" options={{ title: L.tabs.more }} />
+      </TopTabs>
+    </JumpContext.Provider>
   );
 }

@@ -7,6 +7,7 @@ import { View } from 'react-native';
 
 import { BarChart, Ring } from '../components/charts';
 import { DateNav } from '../components/DateNav';
+import { useEntrySheet, WaterEditSheet } from '../components/EntryEditor';
 import { WaterForm } from '../components/forms';
 import { Icon } from '../components/Icon';
 import { Card, Empty, fmt, H, Hint, ListItem, Row, Segmented, Stat, T } from '../components/ui';
@@ -15,12 +16,14 @@ import { lastDays, shortLabel, timeLabel, todayKey } from '../lib/date';
 import { useWaterDay } from '../lib/hooks';
 import { alpha, useTheme } from '../lib/theme';
 import { removeWater } from '../store/actions';
+import type { WaterEntry } from '../store/types';
 import { useStore } from '../store/store';
 
 export function Water() {
   const c = useTheme();
   const L = useT();
   const [date, setDate] = useState(todayKey());
+  const editor = useEntrySheet<WaterEntry>();
   const allWater = useStore((s) => s.water);
   const [period, setPeriod] = useState<7 | 30>(7);
   const { entries, total, other, fluid, range } = useWaterDay(date);
@@ -76,6 +79,7 @@ export function Water() {
                 left={<Icon name={isOther ? 'drink' : 'water'} size={20} color={isOther ? c.high : c.water} />}
                 title={`${fmt(e.ml)} ${L.units.ml}`}
                 subtitle={`${timeLabel(e.time)} · ${L.water.kinds[isOther ? 'other' : 'water']}`}
+                onPress={() => editor.edit(e)}
                 onDelete={() => removeWater(e.id)}
               />
             );
@@ -84,6 +88,7 @@ export function Water() {
           <Empty text={L.water.empty} />
         )}
         {entries.length ? <T dim size={12}>{L.common.longPressDelete}</T> : null}
+        <WaterEditSheet sheet={editor} />
       </Card>
 
       <Card>

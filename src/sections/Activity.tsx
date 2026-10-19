@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { BarChart } from '../components/charts';
 import { DateNav } from '../components/DateNav';
+import { useEntrySheet, WorkoutEditSheet } from '../components/EntryEditor';
 import { StepsForm, TemplateForm, TemplateGrid, WorkoutForm } from '../components/forms';
 import { Sheet } from '../components/Sheet';
 import { Button, Card, Empty, fmt, H, Hint, ListItem, Row, Segmented, Stat, T, Tap } from '../components/ui';
@@ -15,7 +16,7 @@ import { hcSyncSteps } from '../lib/healthConnect';
 import { useTheme } from '../lib/theme';
 import { removeWorkout } from '../store/actions';
 import { useStore } from '../store/store';
-import type { WorkoutTemplate } from '../store/types';
+import type { WorkoutEntry, WorkoutTemplate } from '../store/types';
 
 type SheetState = { kind: 'log'; template: WorkoutTemplate | null } | { kind: 'template'; template: WorkoutTemplate | null } | { kind: 'steps' };
 
@@ -24,6 +25,7 @@ export function Activity() {
   const L = useT();
   const [date, setDate] = useState(todayKey());
   const [sheet, setSheet] = useState<SheetState | null>(null);
+  const editor = useEntrySheet<WorkoutEntry>();
   const [period, setPeriod] = useState<7 | 30>(7);
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
   const weight = useStore((s) => s.profile.weightKg);
@@ -76,11 +78,13 @@ export function Activity() {
         <H icon="workout" right={<T dim size={13}>{fmt(workoutKcal)} {L.units.kcal}</T>}>{L.activity.workouts}</H>
         {workouts.length ? (
           workouts.map((w) => (
-            <ListItem key={w.id} title={w.name} subtitle={`${fmt(w.minutes)} ${L.units.min}${w.note ? ` · ${w.note}` : ''}`} right={<T bold>{fmt(w.kcal)} {L.units.kcal}</T>} onDelete={() => removeWorkout(w.id)} />
+            <ListItem key={w.id} title={w.name} subtitle={`${fmt(w.minutes)} ${L.units.min}${w.note ? ` · ${w.note}` : ''}`} right={<T bold>{fmt(w.kcal)} {L.units.kcal}</T>} onPress={() => editor.edit(w)} onDelete={() => removeWorkout(w.id)} />
           ))
         ) : (
           <Empty text={L.activity.workoutsEmpty} />
         )}
+        {workouts.length ? <T dim size={12}>{L.common.longPressDelete}</T> : null}
+        <WorkoutEditSheet sheet={editor} />
         <Button title={L.activity.custom} icon="plus" kind="secondary" onPress={() => setSheet({ kind: 'log', template: null })} />
       </Card>
 

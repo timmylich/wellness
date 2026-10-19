@@ -18,7 +18,7 @@ import { useTheme } from '../lib/theme';
 import { removeHealthRecord, saveHealthRecord } from '../store/actions';
 import { uid, useStore } from '../store/store';
 import type { HealthRecord, HealthRecordKind } from '../store/types';
-import { DateStep } from './Pantry';
+import { DateStep } from '../components/DateStep';
 
 const KIND_ICON = { visit: 'user', test: 'pulse', other: 'info' } as const;
 const now = () => Date.now();

@@ -34,8 +34,28 @@ class NestedScrollHost(context: Context, appContext: AppContext) : ExpoView(cont
   private var held = false
   private val holdRunnable = Runnable { if (!decided) { held = true; decided = true; claim(true) } }
 
+  /** Whether this host currently keeps the gesture from its ancestors. */
+  private var claimed = false
+
   private fun claim(disallow: Boolean) {
+    claimed = disallow
     parent?.requestDisallowInterceptTouchEvent(disallow)
+    // Releasing clears the flag on every ancestor, including ones an outer host (a carousel
+    // around this chart) still holds for itself, so let that host take it back.
+    if (!disallow) outerHost()?.reclaim()
+  }
+
+  private fun reclaim() {
+    if (claimed) parent?.requestDisallowInterceptTouchEvent(true)
+  }
+
+  private fun outerHost(): NestedScrollHost? {
+    var p = parent
+    while (p != null) {
+      if (p is NestedScrollHost) return p
+      p = p.parent
+    }
+    return null
   }
 
   override fun onInterceptTouchEvent(e: MotionEvent): Boolean {

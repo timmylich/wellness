@@ -13,6 +13,7 @@ import type {
   MealType,
   Profile,
   Settings,
+  WaterEntry,
   WorkoutEntry,
   WorkoutTemplate,
 } from './types';
@@ -21,6 +22,10 @@ type ListKey = 'foodLog' | 'water' | 'workouts' | 'heart' | 'body' | 'pantry' | 
 
 function removeFrom(key: ListKey, id: string) {
   setState((s) => ({ ...s, [key]: (s[key] as { id: string }[]).filter((e) => e.id !== id) }));
+}
+
+function updateIn<T extends { id: string }>(list: T[], id: string, patch: Partial<T>): T[] {
+  return list.map((e) => (e.id === id ? { ...e, ...patch } : e));
 }
 
 // ---- profile & settings ----------------------------------------------------
@@ -124,6 +129,10 @@ export function addWater(ml: number, date = todayKey(), kind: FluidKind = 'water
 
 export const removeWater = (id: string) => removeFrom('water', id);
 
+export function updateWater(id: string, patch: Partial<Omit<WaterEntry, 'id'>>) {
+  setState((s) => ({ ...s, water: updateIn<WaterEntry>(s.water, id, patch) }));
+}
+
 // ---- activity ------------------------------------------------------------------
 
 export function addWorkout(w: Omit<WorkoutEntry, 'id' | 'time'>) {
@@ -131,6 +140,10 @@ export function addWorkout(w: Omit<WorkoutEntry, 'id' | 'time'>) {
 }
 
 export const removeWorkout = (id: string) => removeFrom('workouts', id);
+
+export function updateWorkout(id: string, patch: Partial<Omit<WorkoutEntry, 'id'>>) {
+  setState((s) => ({ ...s, workouts: updateIn<WorkoutEntry>(s.workouts, id, patch) }));
+}
 
 export function saveWorkoutTemplate(t: WorkoutTemplate) {
   setState((s) => {
@@ -173,6 +186,10 @@ export function addHeart(e: Omit<HeartEntry, 'id' | 'time' | 'date'>) {
 
 export const removeHeart = (id: string) => removeFrom('heart', id);
 
+export function updateHeart(id: string, patch: Partial<Omit<HeartEntry, 'id'>>) {
+  setState((s) => ({ ...s, heart: updateIn<HeartEntry>(s.heart, id, patch) }));
+}
+
 /** Log body measurements; a new weight also updates the profile weight used in calculations. */
 export function addBody(e: Omit<BodyEntry, 'id' | 'time' | 'date'>) {
   setState((s) => ({
@@ -187,6 +204,26 @@ export function addBody(e: Omit<BodyEntry, 'id' | 'time' | 'date'>) {
 }
 
 export const removeBody = (id: string) => removeFrom('body', id);
+
+/**
+ * Edit a body entry. Fields set to undefined are cleared. The profile weight and height follow
+ * the latest entry that has them, so editing (or back-dating) the last weigh-in keeps the
+ * calculations in step.
+ */
+export function updateBody(id: string, patch: Partial<Omit<BodyEntry, 'id'>>) {
+  setState((s) => {
+    const body = updateIn<BodyEntry>(s.body, id, patch);
+    const latest = (k: 'weightKg' | 'heightCm') =>
+      body.filter((e) => e[k] != null).reduce<BodyEntry | null>((a, e) => (!a || e.time > a.time ? e : a), null)?.[k];
+    const weightKg = latest('weightKg');
+    const heightCm = latest('heightCm');
+    return {
+      ...s,
+      body,
+      profile: { ...s.profile, ...(weightKg ? { weightKg } : null), ...(heightCm ? { heightCm } : null) },
+    };
+  });
+}
 
 // ---- pantry ------------------------------------------------------------------------
 

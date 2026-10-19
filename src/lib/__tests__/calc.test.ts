@@ -21,6 +21,7 @@ import {
   waterRange,
   weightTrend,
 } from '../calc';
+import { atTime } from '../date';
 import { isMilestone, pendingMilestone } from '../donation';
 import { fromOff, matchScore, queryWords } from '../foodApi';
 import { en } from '../../i18n/en';
@@ -256,5 +257,12 @@ describe('i18n', () => {
     const shape = (o: unknown): unknown =>
       Array.isArray(o) ? o.length : o && typeof o === 'object' ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, shape(v)])) : typeof o;
     expect(shape(en)).toEqual(shape(ru));
+  });
+});
+
+describe('dates', () => {
+  it('builds a local timestamp from a day key and a time', () => {
+    const t = new Date(atTime('2026-03-05', 7, 45));
+    expect([t.getFullYear(), t.getMonth(), t.getDate(), t.getHours(), t.getMinutes()]).toEqual([2026, 2, 5, 7, 45]);
   });
 });

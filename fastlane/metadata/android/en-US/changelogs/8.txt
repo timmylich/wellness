@@ -1,1 +1,1 @@
-Health tab for doctor visits and lab tests, AMOLED theme, swipe between bottom tabs, Google Fit style charts, wheel pickers for pressure and weight, faster startup, smoother navigation and many fixes.
+Health tab for doctor visits and lab tests, editable entries (values, date and time), AMOLED theme, swipe between bottom tabs, Google Fit style charts, wheel pickers for pressure and weight, faster startup, smoother navigation and many fixes.

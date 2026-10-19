@@ -54,3 +54,10 @@ export function timeLabel(ms: number): string {
   const d = new Date(ms);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** Timestamp of `key` at hours:minutes, local time. */
+export function atTime(key: string, hours: number, minutes: number): number {
+  const d = parseKey(key);
+  d.setHours(hours, minutes, 0, 0);
+  return d.getTime();
+}

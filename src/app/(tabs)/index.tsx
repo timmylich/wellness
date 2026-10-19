@@ -129,12 +129,14 @@ function SectionBar({
   const pillX = along((k) => xAt(k, k));
   const pillW = (k: number) => TAB_BASE + W(k);
   // Bar background, as wide as the visible tabs and centred. Built like the pill (two circles
-  // plus a 1 px middle stretched by scaleX), so its width follows the swipe on the native thread.
+  // plus a stretched middle), so its width follows the swipe on the native thread.
   const bgW = (k: number) => iconsW + W(k);
   const bgLeft = along((k) => (totalW - bgW(k)) / 2);
   const bgRight = along((k) => (totalW + bgW(k)) / 2);
-  const bgMid = totalW / 2 - 0.5;
-  const bgSpan = along((k) => bgW(k) - BAR_H + 2);
+  // Stretched middles start full width and only shrink: Android rounds a view's width to whole
+  // pixels, and scaling a tiny base would multiply that error into visible overhangs.
+  const bgSpan = along((k) => (bgW(k) - BAR_H) / totalW);
+  const pillBase = TAB_BASE + maxLabel;
   const pill = mix(c.accent, c.card, 0.16);
 
   return (
@@ -168,7 +170,7 @@ function SectionBar({
                   <Animated.View key={`r${inset}`} style={{ position: 'absolute', top: inset, left: 0, width: d, height: d, borderRadius: d / 2, backgroundColor: color, transform: [{ translateX: Animated.add(bgRight, inset - BAR_H) }] }} />,
                   <Animated.View
                     key={`m${inset}`}
-                    style={{ position: 'absolute', top: inset, left: 0, width: 1, height: d, backgroundColor: color, transform: [{ translateX: bgMid }, { scaleX: bgSpan }] }}
+                    style={{ position: 'absolute', top: inset, left: 0, width: totalW, height: d, backgroundColor: color, transform: [{ scaleX: bgSpan }] }}
                   />,
                 ];
               })}
@@ -178,15 +180,15 @@ function SectionBar({
             {n > 1 && (
               // Solid colour (accent blended over the card), so overlaps never look darker.
               <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: BAR_PAD, height: TAB_H }}>
-                {/* Left cap, stretched middle (1 px scaled), right cap. */}
+                {/* Left cap, stretched middle, right cap. */}
                 <Animated.View style={{ position: 'absolute', width: TAB_H, height: TAB_H, borderRadius: R, backgroundColor: pill, transform: [{ translateX: pillX }] }} />
                 <Animated.View
                   style={{
                     position: 'absolute',
-                    width: 1,
+                    width: pillBase,
                     height: TAB_H,
                     backgroundColor: pill,
-                    transform: [{ translateX: along((k) => xAt(k, k) + pillW(k) / 2 - 0.5) }, { scaleX: along((k) => pillW(k) - TAB_H - 2) }],
+                    transform: [{ translateX: along((k) => xAt(k, k) + pillW(k) / 2 - pillBase / 2) }, { scaleX: along((k) => (pillW(k) - TAB_H) / pillBase) }],
                   }}
                 />
                 <Animated.View style={{ position: 'absolute', width: TAB_H, height: TAB_H, borderRadius: R, backgroundColor: pill, transform: [{ translateX: along((k) => xAt(k, k) + pillW(k) - TAB_H) }] }} />
@@ -352,16 +354,29 @@ export default function Overview() {
     if (i < 0 || i === index) return;
     mount([t]);
     setTab(t);
-    if (!motion) return pager.current?.setPageWithoutAnimation(i);
-    if (Math.abs(i - index) < 2) return pager.current?.setPage(i);
-    // Distant tab: switch the page at once (the pages in between are never shown or mounted)
-    // and fade it in, while the bar highlight glides straight to the target.
+    if (Math.abs(i - index) < 2 && motion) return pager.current?.setPage(i);
+    // An instant page switch sends no scroll event, so move the bar's position by hand.
+    pager.current?.setPageWithoutAnimation(i);
+    position.setValue(i);
+    offset.setValue(0);
+    if (!motion) return;
+    // Distant tab: the page switched at once (the pages in between are never shown or
+    // mounted) and fades in, while the bar highlight glides straight to the target.
     const j: Jump = { from: index, to: i, p: new Animated.Value(0) };
     jumpRef.current = j;
     setJump(j);
-    pager.current?.setPageWithoutAnimation(i);
-    Animated.timing(j.p, { toValue: 1, duration: dur(JUMP_MS), easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(endJump);
   };
+  // Start the jump animation once its frame is on screen; started earlier, a slow render of
+  // the new page could swallow it.
+  useEffect(() => {
+    if (!jump) return;
+    const anim = Animated.timing(jump.p, { toValue: 1, duration: dur(JUMP_MS), easing: Easing.out(Easing.cubic), useNativeDriver: true });
+    const raf = requestAnimationFrame(() => anim.start(({ finished }) => finished && endJump()));
+    return () => {
+      cancelAnimationFrame(raf);
+      anim.stop();
+    };
+  }, [jump]);
   // Back to following the pager once the jump animation is over.
   function endJump() {
     if (!jumpRef.current) return;
@@ -382,7 +397,7 @@ export default function Overview() {
     const id = setTimeout(() => mount([pending]), visited.size <= 1 ? 600 : 350);
     return () => clearTimeout(id);
   }, [pending, jump, visited.size]);
-  // A nested carousel disables paging imperatively while touched (no re-render).
+  // A chart being scrubbed disables paging imperatively (no re-render).
   const setLocked = useCallback((locked: boolean) => pager.current?.setScrollEnabled(!locked), []);
 
   const pick = (kind: AddKind) => {
