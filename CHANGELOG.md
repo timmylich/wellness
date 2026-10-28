@@ -6,6 +6,38 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-10-29
+
+First public release. Wellness is a free, open-source health tracker for Android that keeps
+all your data on the phone: no ads, no accounts, no analytics, no Google services.
+
+**Why Wellness**
+- **Private by design** — offline-first, nothing leaves the phone except optional food search
+  and update check (both can be turned off). JSON export/import.
+- **Evidence-based** — every norm and limit cites WHO, EFSA/IOM, ACC/AHA or USDA and is
+  covered by tests.
+- **Fast food logging without AI** — offline database (CIS dishes + ~2300 European foods),
+  Open Food Facts and USDA search, barcodes, counting by pieces, recents and favourites.
+- **Everything in one place** — 12 nutrient scales, energy balance, water, steps without Google
+  Fit, workouts, blood pressure, weight trend and body fat, pantry with expiry reminders, tips.
+- **Light** — no Google Play services, works on Android 8+, English and Russian.
+
+**Install**: download `wellness-0.5.2.apk` below and open it on your phone. Verify with the
+`.sha256` file if you like. Not a medical device.
+
+
+### Added
+- Swiping past the first or last Overview section opens the neighbouring bottom tab.
+- Backups now include health record photos, so they survive a reinstall or a new phone.
+
+### Changed
+- Editing a weight, measurement or blood pressure entry asks only for the date. Water and
+  workout entries keep the time wheels.
+
+### Fixed
+- Tab bar highlights no longer jerk back during a switch.
+- A crash in the bottom tabs when the set of tabs changed.
+
 ## [0.5.1] — 2026-10-19
 
 ### Added

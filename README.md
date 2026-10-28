@@ -29,14 +29,17 @@
 
 ---
 
-<!-- Screenshots: put PNGs into docs/screenshots/ (1080×2400 works well) and uncomment.
 <p align="center">
-  <img src="docs/screenshots/summary.png" width="200" />
-  <img src="docs/screenshots/food.png" width="200" />
-  <img src="docs/screenshots/water.png" width="200" />
-  <img src="docs/screenshots/body.png" width="200" />
+  <img src="docs/screenshots/summary.jpg" width="24%" alt="Daily summary" />
+  <img src="docs/screenshots/add_food.jpg" width="24%" alt="Adding food" />
+  <img src="docs/screenshots/heart.jpg" width="24%" alt="Blood pressure and pulse" />
+  <img src="docs/screenshots/tips.jpg" width="24%" alt="Health tips" />
 </p>
--->
+<p align="center">
+  <img src="docs/screenshots/pantry.jpg" width="24%" alt="Pantry with expiry dates" />
+  <img src="docs/screenshots/pantry_add_product.jpg" width="24%" alt="Adding a pantry product" />
+  <img src="docs/screenshots/more.jpg" width="24%" alt="Settings and more" />
+</p>
 
 ## Features
 

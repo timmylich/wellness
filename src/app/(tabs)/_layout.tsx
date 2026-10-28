@@ -28,7 +28,7 @@ const JUMP_MS = 300;
  * shown or mounted); instead the highlight goes straight from `from` to `to` and the new page
  * slides in like a neighbour, while `p` runs 0 → 1.
  */
-type Jump = { from: number; to: number; key: string; p: Animated.Value };
+type Jump = { from: number; to: number; key: string; p: Animated.Value; go: () => void };
 
 const JumpContext = createContext<Jump | null>(null);
 
@@ -69,13 +69,20 @@ function BottomBar({ state, descriptors, navigation, position, jump, setJump }: 
         ? position.interpolate({ inputRange, outputRange: inputRange.map(f), extrapolate: clamp ? 'clamp' : 'extend' })
         : f(0);
   const pillX = along((i) => i * slot + (slot - PILL_W) / 2);
+  // Keeps the JS copy of the native-driven position current, so a re-render mid-swipe or
+  // mid-jump never rebuilds the highlight at a stale spot (a one-frame flash back).
+  useEffect(() => {
+    const id = position.addListener(() => {});
+    return () => position.removeListener(id);
+  }, [position]);
 
   const go = (i: number) => {
     const from = state.index;
     if (!motion || Math.abs(i - from) < 2) return navigation.navigate(routes[i].name);
-    // Distant tab: batched with the navigation, `jump` turns the pager's slide off for it.
-    setJump({ from, to: i, key: routes[i].key, p: new Animated.Value(0) });
-    navigation.navigate(routes[i].name);
+    // Distant tab: `jump` turns the pager's slide off and puts the highlight on the jump first;
+    // the navigation itself runs in the layout's effect, once that is committed, so the
+    // highlight never flashes at the target before the animation.
+    setJump({ from, to: i, key: routes[i].key, p: new Animated.Value(0), go: () => navigation.navigate(routes[i].name) });
   };
   return (
     <View style={{ height: BAR_H + insets.bottom, paddingBottom: insets.bottom, backgroundColor: c.card, borderTopWidth: 1, borderTopColor: c.border }}>
@@ -125,11 +132,14 @@ export default function TabsLayout() {
   // the new page could swallow the animation.
   useEffect(() => {
     if (!jump) return;
+    jump.go();
+    const sub = jump.p.addListener(() => {});
     const anim = Animated.timing(jump.p, { toValue: 1, duration: dur(JUMP_MS), easing: Easing.out(Easing.cubic), useNativeDriver: true });
     const raf = requestAnimationFrame(() => anim.start(({ finished }) => finished && setJump((cur) => (cur === jump ? null : cur))));
     return () => {
       cancelAnimationFrame(raf);
       anim.stop();
+      jump.p.removeListener(sub);
     };
   }, [jump]);
   const sections = useStore((s) => s.settings.sections);
@@ -142,7 +152,9 @@ export default function TabsLayout() {
         initialRouteName="index"
         tabBarPosition="bottom"
         tabBar={(props: MaterialTopTabBarProps) => <BottomBar {...props} jump={jump} setJump={setJump} />}
-        screenLayout={SceneLayout}
+        // A real element: screenLayout is called as a plain function inside the navigator's render,
+        // so hooks called directly in it would belong to the navigator and crash.
+        screenLayout={(p: { children: ReactNode; route: { key: string } }) => <SceneLayout {...p} />}
         screenOptions={{
           animationEnabled: motion && !jump,
           lazy: true,

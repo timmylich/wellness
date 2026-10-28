@@ -1,0 +1,5 @@
+First public release.
+• Editing weight and blood pressure entries asks only for the date.
+• Swipe past the first or last Overview section to open the next tab.
+• Backups include health record photos.
+• Smoother tab switching.

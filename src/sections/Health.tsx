@@ -1,9 +1,8 @@
 /**
  * Health records: doctor visits, lab tests and other documents with photos. Photos are copied
- * into the app's private document folder (Paths.document/health), so they survive the user
- * deleting the original from the gallery. Nothing leaves the phone.
+ * into the app's private folder (lib/photos.ts) and included in backups. Nothing leaves the
+ * phone.
  */
-import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useMemo, useState } from 'react';
 import { Image, Modal, Pressable, View } from 'react-native';
@@ -14,6 +13,7 @@ import { Sheet } from '../components/Sheet';
 import { Button, Card, Empty, Field, H, Row, Segmented, T, Tap } from '../components/ui';
 import { useT } from '../i18n';
 import { humanDate, todayKey } from '../lib/date';
+import { deletePhotos, keepPhotos } from '../lib/photos';
 import { useTheme } from '../lib/theme';
 import { removeHealthRecord, saveHealthRecord } from '../store/actions';
 import { uid, useStore } from '../store/store';
@@ -22,34 +22,6 @@ import { DateStep } from '../components/DateStep';
 
 const KIND_ICON = { visit: 'user', test: 'pulse', other: 'info' } as const;
 const now = () => Date.now();
-
-function photoDir(): Directory {
-  const d = new Directory(Paths.document, 'health');
-  if (!d.exists) d.create({ intermediates: true, idempotent: true });
-  return d;
-}
-
-/** Copy picked images into the app folder; returns their new URIs. */
-async function keepPhotos(uris: string[]): Promise<string[]> {
-  const dir = photoDir();
-  const out: string[] = [];
-  for (const uri of uris) {
-    const ext = uri.split('?')[0].split('.').pop()?.toLowerCase() || 'jpg';
-    const dest = new File(dir, `${uid()}.${ext.length <= 4 ? ext : 'jpg'}`);
-    await new File(uri).copy(dest);
-    out.push(dest.uri);
-  }
-  return out;
-}
-
-function deletePhotos(uris: string[]) {
-  for (const u of uris) {
-    try {
-      const f = new File(u);
-      if (f.exists) f.delete();
-    } catch {}
-  }
-}
 
 export function Health() {
   const c = useTheme();

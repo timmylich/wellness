@@ -51,8 +51,11 @@ export function useEntrySheet<E extends { id: string }>() {
   };
 }
 
-/** Date (− / + days) and time (hour and minute wheels) of an entry. */
-function useWhen(time: number, date: string) {
+/**
+ * Date (− / + days) and, unless `dateOnly`, time (hour and minute wheels) of an entry.
+ * Date-only entries keep their original time of day.
+ */
+function useWhen(time: number, date: string, dateOnly = false) {
   const d = new Date(time);
   const [day, setDay] = useState(date);
   const [h, setH] = useState(d.getHours());
@@ -61,25 +64,51 @@ function useWhen(time: number, date: string) {
   const fields = (
     <View style={{ gap: 8 }}>
       <DateStep label={L.common.date} value={day} onChange={setDay} />
-      <T dim size={13}>{L.common.time}</T>
-      <Row style={{ flexWrap: 'nowrap', justifyContent: 'center' }}>
-        <Wheel values={HOURS} value={h} onChange={setH} width={72} format={two} />
-        <T size={26} bold>:</T>
-        <Wheel values={MINUTES} value={m} onChange={setM} width={72} format={two} />
-      </Row>
+      {!dateOnly && (
+        <>
+          <T dim size={13}>
+            {L.common.time}
+          </T>
+          <Row style={{ flexWrap: 'nowrap', justifyContent: 'center' }}>
+            <Wheel values={HOURS} value={h} onChange={setH} width={72} format={two} />
+            <T size={26} bold>
+              :
+            </T>
+            <Wheel values={MINUTES} value={m} onChange={setM} width={72} format={two} />
+          </Row>
+        </>
+      )}
     </View>
   );
   return { fields, value: { date: day, time: atTime(day, h, m) } };
 }
 
 /** Title, the form, then Save and Delete. */
-function Frame({ children, onSave, onDelete, title }: { children: React.ReactNode; onSave: () => void; onDelete: () => void; title: string }) {
+function Frame({
+  children,
+  onSave,
+  onDelete,
+  title,
+}: {
+  children: React.ReactNode;
+  onSave: () => void;
+  onDelete: () => void;
+  title: string;
+}) {
   const L = useT();
   const del = () =>
-    confirmDialog({ title: L.common.deleteEntry, message: title, cancel: L.common.cancel, ok: L.common.delete, onOk: onDelete });
+    confirmDialog({
+      title: L.common.deleteEntry,
+      message: title,
+      cancel: L.common.cancel,
+      ok: L.common.delete,
+      onOk: onDelete,
+    });
   return (
     <View style={{ gap: 12 }}>
-      <T size={18} bold>{L.common.editEntry}</T>
+      <T size={18} bold>
+        {L.common.editEntry}
+      </T>
       {children}
       <Button title={L.common.save} onPress={onSave} />
       <Button title={L.common.delete} kind="danger" icon="trash" onPress={del} />
@@ -124,7 +153,13 @@ function WorkoutEdit({ entry, onDone }: { entry: WorkoutEntry; onDone: () => voi
   const save = () => {
     const k = parseNum(kcal);
     if (!name.trim() || k == null) return showDialog({ title: L.activity.needNameKcal, icon: 'info' });
-    updateWorkout(entry.id, { name: name.trim(), minutes: parseNum(minutes) ?? 0, kcal: Math.round(k), note: note.trim() || undefined, ...when.value });
+    updateWorkout(entry.id, {
+      name: name.trim(),
+      minutes: parseNum(minutes) ?? 0,
+      kcal: Math.round(k),
+      note: note.trim() || undefined,
+      ...when.value,
+    });
     onDone();
   };
   return (
@@ -146,9 +181,11 @@ function HeartEdit({ entry, onDone }: { entry: HeartEntry; onDone: () => void })
   const [dia, setDia] = useState(str(entry.diastolic));
   const [pulse, setPulse] = useState(str(entry.pulse));
   const [note, setNote] = useState(entry.note ?? '');
-  const when = useWhen(entry.time, entry.date);
+  const when = useWhen(entry.time, entry.date, true);
   const save = () => {
-    const s = parseNum(sys), d = parseNum(dia), p = parseNum(pulse);
+    const s = parseNum(sys),
+      d = parseNum(dia),
+      p = parseNum(pulse);
     // Pressure needs both numbers; a reading needs pressure or pulse.
     if ((s == null) !== (d == null) || (s == null && p == null)) return;
     updateHeart(entry.id, {
@@ -160,7 +197,12 @@ function HeartEdit({ entry, onDone }: { entry: HeartEntry; onDone: () => void })
     });
     onDone();
   };
-  const title = [entry.systolic && entry.diastolic ? `${entry.systolic}/${entry.diastolic}` : null, entry.pulse ? `♥ ${entry.pulse}` : null].filter(Boolean).join('   ');
+  const title = [
+    entry.systolic && entry.diastolic ? `${entry.systolic}/${entry.diastolic}` : null,
+    entry.pulse ? `♥ ${entry.pulse}` : null,
+  ]
+    .filter(Boolean)
+    .join('   ');
   return (
     <Frame title={title} onSave={save} onDelete={() => (removeHeart(entry.id), onDone())}>
       <Row>
@@ -185,7 +227,7 @@ function BodyEdit({ entry, onDone }: { entry: BodyEntry; onDone: () => void }) {
     height: str(entry.heightCm),
   });
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
-  const when = useWhen(entry.time, entry.date);
+  const when = useWhen(entry.time, entry.date, true);
   const save = () => {
     const values = {
       weightKg: parseNum(f.weight),

@@ -2,7 +2,7 @@
  * Overview: sections in a horizontal pager (swipe between them), a transparent tab bar whose
  * highlight follows the swipe, and a pinned "+" button that fans out quick actions around it.
  */
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
@@ -335,6 +335,13 @@ export default function Overview() {
   const [position] = useState(() => new Animated.Value(0));
   const [offset] = useState(() => new Animated.Value(0));
   const [progress] = useState(() => Animated.add(position, offset));
+  // Native-driven values never update their JS copy unless listened to, and every re-render of
+  // the bar rebuilds its interpolations from that copy: a stale one flashes the highlight back
+  // to an old tab for a frame. Listening keeps the JS copy current.
+  useEffect(() => {
+    const id = progress.addListener(() => {});
+    return () => progress.removeListener(id);
+  }, [progress]);
   const pager = useRef<PagerView>(null);
   const [jump, setJump] = useState<Jump | null>(null);
   const jumpRef = useRef<Jump | null>(null);
@@ -349,34 +356,43 @@ export default function Overview() {
       return add.length ? new Set([...prev, ...add]) : prev;
     });
 
+  // An instant page switch sends no scroll event, so move the bar's position by hand.
+  const switchNow = (i: number) => {
+    pager.current?.setPageWithoutAnimation(i);
+    position.setValue(i);
+    offset.setValue(0);
+  };
   const select = (t: Tab) => {
     const i = tabs.findIndex((x) => x.id === t);
     if (i < 0 || i === index) return;
     mount([t]);
     setTab(t);
     if (Math.abs(i - index) < 2 && motion) return pager.current?.setPage(i);
-    // An instant page switch sends no scroll event, so move the bar's position by hand.
-    pager.current?.setPageWithoutAnimation(i);
-    position.setValue(i);
-    offset.setValue(0);
-    if (!motion) return;
-    // Distant tab: the page switched at once (the pages in between are never shown or
-    // mounted) and fades in, while the bar highlight glides straight to the target.
+    if (!motion) return switchNow(i);
+    // Distant tab: the page switches at once (the pages in between are never shown or
+    // mounted) and fades in, while the bar highlight glides straight to the target. The
+    // switch waits for the effect below: done here, the bar (still following the pager) would
+    // flash at the target for a frame before the jump starts from the old tab.
     const j: Jump = { from: index, to: i, p: new Animated.Value(0) };
     jumpRef.current = j;
     setJump(j);
   };
-  // Start the jump animation once its frame is on screen; started earlier, a slow render of
-  // the new page could swallow it.
+  // Switch the page once the bar follows the jump, and start the animation once that frame is
+  // on screen; started earlier, a slow render of the new page could swallow it.
   useEffect(() => {
     if (!jump) return;
+    pager.current?.setPageWithoutAnimation(jump.to);
+    position.setValue(jump.to);
+    offset.setValue(0);
+    const sub = jump.p.addListener(() => {});
     const anim = Animated.timing(jump.p, { toValue: 1, duration: dur(JUMP_MS), easing: Easing.out(Easing.cubic), useNativeDriver: true });
     const raf = requestAnimationFrame(() => anim.start(({ finished }) => finished && endJump()));
     return () => {
       cancelAnimationFrame(raf);
       anim.stop();
+      jump.p.removeListener(sub);
     };
-  }, [jump]);
+  }, [jump, position, offset]);
   // Back to following the pager once the jump animation is over.
   function endJump() {
     if (!jumpRef.current) return;
@@ -398,7 +414,26 @@ export default function Overview() {
     return () => clearTimeout(id);
   }, [pending, jump, visited.size]);
   // A chart being scrubbed disables paging imperatively (no re-render).
-  const setLocked = useCallback((locked: boolean) => pager.current?.setScrollEnabled(!locked), []);
+  const lockedRef = useRef(false);
+  const setLocked = useCallback((locked: boolean) => {
+    lockedRef.current = locked;
+    pager.current?.setScrollEnabled(!locked);
+  }, []);
+
+  // Swiping past the first or last section moves to the neighbouring bottom tab: the pager
+  // took a drag (not a carousel or chart) but could not move, so it was pulled past its edge.
+  // The pager cancels JS touches once it takes a drag, so this relies on its own events.
+  const navigation = useNavigation();
+  const edge = useRef({ dragged: false, moved: false });
+  const onEdgeIdle = () => {
+    const g = edge.current;
+    edge.current = { dragged: false, moved: false };
+    if (!g.dragged || g.moved || lockedRef.current || jump || tabs.length < 2) return;
+    const dir = index === 0 ? -1 : index === tabs.length - 1 ? 1 : 0;
+    const st = navigation.getState();
+    const next = dir && st ? st.routes[st.index + dir] : undefined;
+    if (next) navigation.navigate(next.name as never);
+  };
 
   const pick = (kind: AddKind) => {
     if (kind === 'food') return router.push('/food-search');
@@ -409,13 +444,17 @@ export default function Overview() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-
       <AnimatedPager
         ref={pager}
         style={{ flex: 1 }}
         initialPage={index}
         offscreenPageLimit={1}
-        onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], { useNativeDriver: true })}
+        onPageScroll={Animated.event([{ nativeEvent: { position, offset } }], {
+          useNativeDriver: true,
+          listener: (e: { nativeEvent: { offset: number } }) => {
+            if (e.nativeEvent.offset > 0.01) edge.current.moved = true;
+          },
+        })}
         onPageSelected={(e) => {
           const i = e.nativeEvent.position;
           if (tabs[i] && tabs[i].id !== tab) setTab(tabs[i].id);
@@ -423,7 +462,10 @@ export default function Overview() {
         }}
         onPageScrollStateChanged={(e) => {
           // A drag interrupts a jump.
-          if (e.nativeEvent.pageScrollState === 'dragging') endJump();
+          if (e.nativeEvent.pageScrollState === 'dragging') {
+            endJump();
+            edge.current = { dragged: true, moved: false };
+          } else if (e.nativeEvent.pageScrollState === 'idle') onEdgeIdle();
         }}
       >
         {tabs.map((t, i) => (

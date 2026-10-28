@@ -37,8 +37,8 @@ Never commit the `.jks` file (it is git-ignored).
 4. Commit, then tag and push:
 
    ```bash
-   git tag v0.5.1
-   git push origin main v0.5.1
+   git tag v0.5.2
+   git push origin main v0.5.2
    ```
 
 The workflow checks that the tag matches `app.json`, runs `npm run check`, builds, signs and
@@ -66,9 +66,9 @@ RepoType: git
 Repo: https://github.com/timmylich/wellness.git
 
 Builds:
-  - versionName: 0.5.1
-    versionCode: 8
-    commit: v0.5.1
+  - versionName: 0.5.2
+    versionCode: 9
+    commit: v0.5.2
     sudo:
       - curl -Lo node.tar.xz https://nodejs.org/dist/v22.11.0/node-v22.11.0-linux-x64.tar.xz
       - tar xJf node.tar.xz --strip-components=1 -C /usr/local

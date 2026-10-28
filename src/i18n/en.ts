@@ -273,7 +273,7 @@ export const en: Dict = {
     titleLabel: 'What', titlePh: 'GP, blood test, MRI…', place: 'Doctor, clinic or lab', notes: 'Notes and results',
     date: 'Date', photos: 'Photos', addPhoto: 'Gallery', takePhoto: 'Camera', save: 'Save', remove: 'Delete record',
     removeTitle: 'Delete this record?', removeText: 'Its photos will be deleted too.', search: 'Search records',
-    privacy: 'Records and photos stay on the phone; backups include records but not photos.',
+    privacy: 'Records and photos stay on the phone. Backups include the photos too.',
   },
 
   pantry: {
