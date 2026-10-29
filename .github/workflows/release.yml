@@ -16,6 +16,7 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +41,12 @@ jobs:
           if [ "$APP" != "$TAG" ]; then echo "app.json version $APP != tag $TAG"; exit 1; fi
 
       - name: Generate the native project
-        run: npx expo prebuild --platform android --no-install
+        run: |
+          npx expo prebuild --platform android --no-install
+          # The default 512 MB metaspace runs out on CI and Gradle hangs; later lines win.
+          echo "" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
+          echo "kotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
 
       - name: Build release APK
         working-directory: android
