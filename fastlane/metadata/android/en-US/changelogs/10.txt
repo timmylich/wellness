@@ -1,0 +1,6 @@
+Wellness is now a fully native Android app.
+• Starts about 3× faster; the APK is 1.8 MB instead of 35 MB.
+• Smooth native swipes, charts and animations.
+• Your data and photos carry over on update; old backups import as before.
+• Statistics for 90 days and a whole year.
+• Wheel pickers for birth year, height and weight; tap a chart point to see its value.

@@ -6,6 +6,46 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-08
+
+Wellness is rewritten as a fully native Android app (Kotlin, Jetpack Compose) instead of
+React Native. Same features, same data, much lighter.
+
+**Why update**
+- **Fast** — starts about 3× faster (≈ 0.45 s instead of ≈ 1.6 s cold start on the test
+  phone); scrolling, swipes and charts run natively at the screen's refresh rate.
+- **Tiny** — the APK is 1.8 MB instead of 35 MB, with no JavaScript engine inside.
+- **Native** — platform UI, gestures and system animation settings; still no Google Play
+  services, Android 8+.
+- **Nothing lost** — installs over 0.5.x and keeps all data and health-record photos (the old
+  storage is taken over on first start). Backups keep the same format and import both ways.
+
+**Install**: download `wellness-0.6.0.apk` below and open it on your phone; it updates 0.5.x
+in place. Verify with the `.sha256` file if you like. Not a medical device.
+
+### Added
+- Statistics for 90 days and a whole year: water, steps, nutrients and weight trend; blood
+  pressure stats for up to 365 records.
+- Tap the calorie ring in "Calories & macros" to see which foods contributed most, as for
+  other nutrients.
+- Wheel pickers for birth year, height, weight and goal weight (onboarding and profile).
+- Tap a chart point to see its value (press and hold still scrubs).
+
+### Changed
+- Animations follow the system animation speed only to slow down or turn off; they no longer
+  run faster than designed.
+- Taps on a distant tab or section switch at once and slide in, without flashing the ones between.
+- The section bar highlight follows the finger while swiping between sections.
+
+### Fixed
+- Swiping the "Calories & macros" cards no longer flips sections by accident or leaves the
+  screen stuck between two sections; a long pull past the last card still opens the next one.
+- The back gesture on a settings page now returns to More on the first try.
+- A sideways swipe on the overview, or a quick swipe right after a tab switch, can no longer
+  leave the screen stuck between two tabs.
+- Smoother swipes between sections: all sections are prepared in the background after start.
+- Chart headers with a period selector no longer squeeze the title into a column.
+
 ## [0.5.2] — 2026-10-29
 
 First public release. Wellness is a free, open-source health tracker for Android that keeps

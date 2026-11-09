@@ -43,6 +43,8 @@
 
 ## Features
 
+- **Fast and native** — written in Kotlin with Jetpack Compose: starts in under half a second,
+  smooth swipes and charts, a 1.8 MB APK, no JavaScript engine and no Google Play services.
 - **Food** — 12 daily scales (calories, protein, fat, carbs, sugar, added sugar, sodium, fibre,
   saturated and trans fat, cholesterol, potassium) with personal minimum, target and maximum,
   computed from your profile, goal pace and today's activity. Limit-only nutrients show a limit.
@@ -52,7 +54,7 @@
   editable log entries and importable food packs.
 - **Energy balance** — intake vs expenditure (BMR × lifestyle + workouts + steps), surplus or
   deficit converted into estimated fat mass; optional adaptive targets.
-- **Water** — one big button for water and a separate one for other drinks, charts, recommended
+- **Water** — one big button for water and a separate one for other drinks, charts up to a year, recommended
   range and a clearly marked dangerous amount (hyponatremia).
 - **Activity** — background step counting from the phone's hardware sensor (no Google Fit
   needed) or Health Connect, MET-based workout templates, custom workouts.
@@ -66,7 +68,7 @@
   animations, goal pace slider, custom nutrient limits, JSON export/import.
 
 Every formula and limit cites its source (WHO, IOM/EFSA, ACC/AHA, USDA…) in
-[`src/lib/calc.ts`](src/lib/calc.ts) and is covered by unit tests.
+[`Calc.kt`](app/src/main/java/io/github/timmylich/wellness/lib/Calc.kt) and is covered by unit tests.
 
 ## Install
 
@@ -88,29 +90,28 @@ reporters, ads or Google Play services in the app.
 
 ## Tech
 
-- [Expo](https://expo.dev) SDK 57 · React Native 0.86 · TypeScript · Expo Router
-- Hand-written SVG charts (`react-native-svg`), a ~100-line store on `useSyncExternalStore`
-- A small local Kotlin module (`modules/wellness-native`) for the step counter service, local
-  notifications and nested-gesture handling
-- Typed i18n dictionaries (`src/i18n`), [Lucide](https://lucide.dev) icons
+- Native Android: Kotlin, Jetpack Compose (foundation + Material 3 bottom sheets), one activity
+- Hand-drawn Canvas charts, a small immutable store saved as one JSON file
+- A foreground service for the hardware step counter, local notifications via AlarmManager
+- UI strings in `app/src/main/assets/i18n_{ru,en}.json`, [Lucide](https://lucide.dev) icons as vector drawables
+- No Google Play services; the only libraries are AndroidX, kotlinx.serialization and Health Connect's client
 
+The 1.8 MB APK starts about 3× faster than the former React Native version (0.5.x).
 See [docs/architecture.md](docs/architecture.md) for a tour of the code.
 
 ## Build from source
 
-Requirements: Node 20+, JDK 17–21, Android SDK.
+Requirements: JDK 17–21, Android SDK (platform 36).
 
 ```bash
-npm install
-npm run android                         # dev build on a device or emulator
-npx expo prebuild --platform android    # generate the native project
-npm run build:apk                       # → android/app/build/outputs/apk/release/
-npm run check                           # typecheck + lint + tests (also run in CI)
+./gradlew testDebugUnitTest       # unit tests (also run in CI)
+./gradlew installDebug            # debug build on a connected device
+./gradlew assembleRelease         # → app/build/outputs/apk/release/ (unsigned)
 ```
 
-The `android/` folder is generated (Continuous Native Generation) and not committed; configure
-native behaviour in `app.json`. Releases are built by GitHub Actions — see
-[docs/releasing.md](docs/releasing.md).
+Sign a local release with `scripts/install-signed.ps1`, or put `storeFile`, `storePassword`,
+`keyAlias` and `keyPassword` into a git-ignored `keystore.properties`. Releases are built by
+GitHub Actions — see [docs/releasing.md](docs/releasing.md).
 
 ## Support the project
 
@@ -159,6 +160,8 @@ Icons: Lucide (ISC).
 **Wellness** — бесплатный трекер здоровья с открытым кодом. Без рекламы, регистрации, слежки и
 сервисов Google: все данные хранятся только на телефоне.
 
+- **Быстрое и нативное**: Kotlin и Jetpack Compose, запуск меньше чем за полсекунды, плавные
+  свайпы и графики, APK 1,8 МБ, без JavaScript-движка и сервисов Google.
 - **Еда**: 12 шкал с личными диапазонами (минимум — цель — максимум), офлайн-база продуктов,
   поиск в Open Food Facts и USDA, штрихкоды, счёт по штукам, свои продукты на основе готовых,
   редактирование записей, энергобаланс, советы.

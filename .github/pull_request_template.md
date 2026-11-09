@@ -4,7 +4,7 @@
 
 ## Checklist
 
-- [ ] `npm run check` passes (typecheck, lint, tests)
+- [ ] `./gradlew testDebugUnitTest lintDebug` passes
 - [ ] New health formulas/limits cite a source in a code comment
-- [ ] UI strings added to both `src/i18n/ru.ts` and `en.ts`; code comments in English
+- [ ] UI strings added to both `assets/i18n_ru.json` and `i18n_en.json`; code comments in English
 - [ ] CHANGELOG.md updated (for user-visible changes)

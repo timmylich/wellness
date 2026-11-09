@@ -3,19 +3,19 @@
 Wellness uses **local notifications only**: no push server, no Firebase, no Google Play
 services. That keeps the app private and eligible for F-Droid.
 
-- Delivery: the local Expo module `modules/wellness-native` (`Reminders.kt`) shows a
+- Delivery: `Reminders` in `lib/System.kt` shows a
   notification directly or schedules it with an inexact `AlarmManager` alarm (no exact-alarm
   permission; Android may deliver it a few minutes late).
-- JS API: `src/lib/notifications.ts` — `showNotification`, `scheduleAt`, `cancelScheduled`,
-  `requestNotificationPermission`.
+- API: `Reminders.show`, `Reminders.schedule`, `Reminders.cancel`; the POST_NOTIFICATIONS
+  permission is requested when notifications are turned on (Android 13+).
 - Everything is opt-in in Settings → Notifications.
 
 Current uses:
 
 | Feature | When |
 | --- | --- |
-| Pantry expiry | 10:00 the day before a product expires (`src/sections/Pantry.tsx`) |
-| App update | Once per new version found on GitHub Releases, checked at most daily (`src/lib/updates.ts`) |
+| Pantry expiry | 10:00 the day before a product expires (`screens/PantryHealth.kt`) |
+| App update | Once per new version found on GitHub Releases, checked at most daily (`Updates` in `lib/System.kt`) |
 
 The step counter's foreground service (`StepService.kt`) also shows a silent, minimum-priority
 notification while it runs; Android requires it for any long-running background work.

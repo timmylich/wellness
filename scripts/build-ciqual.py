@@ -1,5 +1,5 @@
 """
-Regenerate src/data/ciqual.json from the official ANSES-CIQUAL table (English edition).
+Regenerate app/src/main/assets/ciqual.json from the official ANSES-CIQUAL table (English edition).
 
     curl -o ciqual.xls "https://ciqual.anses.fr/cms/sites/default/files/inline-files/Table%20Ciqual%202020_ENG_2020%2007%2007.xls"
     python scripts/build-ciqual.py ciqual.xls
@@ -48,7 +48,7 @@ def main(path):
         rows.append([int(v[6]), name[0].upper() + name[1:]] +
                     [round(kcal) if k == 'kcal' else num(v[i]) for k, i in COLS.items()])
     out = {'license': 'ANSES-CIQUAL 2020, Etalab Open Licence 2.0', 'fields': ['code', 'name'] + list(COLS), 'rows': rows}
-    with open('src/data/ciqual.json', 'w', encoding='utf8') as f:
+    with open('app/src/main/assets/ciqual.json', 'w', encoding='utf8') as f:
         json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
     print(f'{len(rows)} foods written')
 

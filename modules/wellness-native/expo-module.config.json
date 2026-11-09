@@ -1,6 +1,0 @@
-{
-  "platforms": ["android"],
-  "android": {
-    "modules": ["io.github.timmylich.wellness.nativebridge.WellnessNativeModule"]
-  }
-}

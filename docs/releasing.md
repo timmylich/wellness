@@ -26,62 +26,122 @@ Add four repository secrets (GitHub → Settings → Secrets and variables → A
 
 Never commit the `.jks` file (it is git-ignored).
 
-> APKs built locally with `npm run build:apk` are signed with the debug key. They cannot be
-> updated by a CI-signed APK (and vice versa): uninstall once when switching.
+> `./gradlew assembleRelease` builds an unsigned APK. `scripts/install-signed.ps1` builds it, signs it with
+> the release key and installs it over ADB. A debug-signed build cannot update a release-signed
+> one (and vice versa): uninstall once when switching.
 
-## Making a release
+## Testing a release build on your phone
 
-1. Bump `version` and `android.versionCode` in `app.json`, and `version` in `package.json`.
-2. Move the `[Unreleased]` notes in `CHANGELOG.md` under a new `## [x.y.z] — YYYY-MM-DD` heading.
-3. Add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (and `ru-RU`), used by F-Droid.
-4. Commit, then tag and push:
+```powershell
+./scripts/install-signed.ps1            # build, sign with key.jks, install over ADB
+./scripts/install-signed.ps1 -NoBuild   # sign and install the APK already built
+```
+
+The script sets `JAVA_HOME` (JDK 17+), `ANDROID_HOME` and `GRADLE_USER_HOME` for this machine
+and asks for the keystore password. The result updates the installed app in place.
+
+## Making a GitHub release
+
+1. Bump `versionName` and `versionCode` in `app/build.gradle.kts` (versionCode always grows).
+2. In `CHANGELOG.md`, move the `[Unreleased]` notes under `## [x.y.z] — YYYY-MM-DD`. This
+   section becomes the release description on GitHub, so write it for users.
+3. Add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` and `ru-RU/…` (up to
+   500 characters, plain text). F-Droid and IzzyOnDroid show them as "What's new".
+4. Check locally: `./gradlew testDebugUnitTest lintDebug`, then install with
+   `./scripts/install-signed.ps1` and try the app.
+5. Commit, merge into `main`, tag and push:
 
    ```bash
-   git tag v0.5.2
-   git push origin main v0.5.2
+   git add -A
+   git commit -m "Release 0.6.0"
+   git checkout main
+   git merge rework            # if the work was on a branch
+   git tag v0.6.0
+   git push origin main v0.6.0
    ```
 
-The workflow checks that the tag matches `app.json`, runs `npm run check`, builds, signs and
-publishes the release. Running the workflow manually ("Run workflow") creates a draft.
+6. GitHub → Actions → **Release**: wait for the green check (~5 min). The workflow checks that
+   the tag matches `versionName`, runs the tests, builds, signs with the repository secrets and
+   publishes `wellness-x.y.z.apk`, its `.sha256` and the AAB.
+7. Open the release page and check the notes and the APK. Installed apps with the update check
+   on will offer the update on their next check.
+
+If the workflow fails, fix it, then move the tag: `git tag -f v0.6.0 && git push -f origin v0.6.0`
+(only while nobody has downloaded the release). Running the workflow manually ("Run workflow")
+creates a draft release for a dry run.
+
+## IzzyOnDroid
+
+[IzzyOnDroid](https://apt.izzysoft.de/fdroid/) is an F-Droid-compatible repository that ships
+the APK from GitHub Releases as is (signed with our key), so it updates within a day of a
+GitHub release. Users add the repo in F-Droid, Droid-ify or Neo Store.
+
+One-time inclusion request:
+
+1. Make sure the latest GitHub release has the APK attached and the app meets the
+   [inclusion criteria](https://gitlab.com/IzzyOnDroid/repo/-/wikis/Inclusion-Policy): FOSS
+   license (AGPL-3.0), no proprietary libraries or trackers, APK under 30 MB.
+2. Open an issue at <https://gitlab.com/IzzyOnDroid/repo/-/issues> with the template
+   "Inclusion request", linking `https://github.com/timmylich/wellness`.
+3. Izzy scans the APK (libraries, permissions, network) and may ask questions in the issue;
+   answer there. Good to mention: optional network use (Open Food Facts, USDA, GitHub update
+   check), the foreground service for step counting, no Google Play services.
+4. The listing (title, descriptions, icon, screenshots, What's new) is read from
+   `fastlane/metadata/android/` in the repository; keep it current.
+
+After inclusion nothing is needed per release: a new GitHub release with a higher versionCode is
+picked up automatically. Never change the signing key: IzzyOnDroid (and users) would reject the
+update.
 
 ## F-Droid
 
-The app has no proprietary dependencies (no Google Play services, no Firebase) and the store
-listing lives in `fastlane/metadata/android/` in the format F-Droid reads.
+F-Droid builds the app from source on its own servers and signs it with **its own key**, so the
+F-Droid build cannot update a GitHub/IzzyOnDroid install (and vice versa); users pick one
+source. The app has no proprietary dependencies (no Google Play services, no Firebase), and the
+store listing lives in `fastlane/metadata/android/` in the format F-Droid reads.
 
-To submit, open a merge request to [fdroiddata](https://gitlab.com/fdroid/fdroiddata) adding
-`metadata/io.github.timmylich.wellness.yml`. A starting point:
+One-time submission:
 
-```yaml
-Categories:
-  - Sports & Health
-License: AGPL-3.0-only
-SourceCode: https://github.com/timmylich/wellness
-IssueTracker: https://github.com/timmylich/wellness/issues
-Changelog: https://github.com/timmylich/wellness/blob/main/CHANGELOG.md
-Donate: https://web.tribute.tg/d/RVs
+1. Create a GitLab account, fork <https://gitlab.com/fdroid/fdroiddata>.
+2. Add `metadata/io.github.timmylich.wellness.yml`:
 
-AutoName: Wellness
-RepoType: git
-Repo: https://github.com/timmylich/wellness.git
+   ```yaml
+   Categories:
+     - Sports & Health
+   License: AGPL-3.0-only
+   AuthorName: timmylich
+   SourceCode: https://github.com/timmylich/wellness
+   IssueTracker: https://github.com/timmylich/wellness/issues
+   Changelog: https://github.com/timmylich/wellness/blob/main/CHANGELOG.md
+   Donate: https://web.tribute.tg/d/RVs
 
-Builds:
-  - versionName: 0.5.2
-    versionCode: 9
-    commit: v0.5.2
-    sudo:
-      - curl -Lo node.tar.xz https://nodejs.org/dist/v22.11.0/node-v22.11.0-linux-x64.tar.xz
-      - tar xJf node.tar.xz --strip-components=1 -C /usr/local
-    init: npm ci
-    prebuild: EXPO_PUBLIC_UPDATE_CHECK=0 npx expo prebuild --platform android --no-install
-    subdir: android/app
-    gradle:
-      - yes
+   AutoName: Wellness
+   RepoType: git
+   Repo: https://github.com/timmylich/wellness.git
 
-AutoUpdateMode: Version
-UpdateCheckMode: Tags
-```
+   Builds:
+     - versionName: 0.6.0
+       versionCode: 10
+       commit: v0.6.0
+       subdir: app
+       gradle:
+         - yes
+       gradleprops:
+         - updateCheck=false
 
-`EXPO_PUBLIC_UPDATE_CHECK=0` removes the GitHub update check from F-Droid builds: F-Droid
-delivers updates itself. F-Droid reviewers may ask for adjustments (for example, scanning
-`node_modules` for prebuilt binaries); follow their comments on the merge request.
+   AutoUpdateMode: Version
+   UpdateCheckMode: Tags
+   CurrentVersion: 0.6.0
+   CurrentVersionCode: 10
+   ```
+
+   `updateCheck=false` removes the GitHub update check from F-Droid builds: F-Droid delivers
+   updates itself.
+3. Optionally test the recipe locally with `fdroid build -v -l io.github.timmylich.wellness`
+   (fdroidserver), or rely on the CI pipeline of the merge request.
+4. Open a merge request to fdroiddata with the template "App inclusion". Reviewers usually
+   answer within days to weeks; follow their comments in the merge request.
+
+After inclusion, F-Droid's bot checks the tags (`UpdateCheckMode: Tags`) and builds every new
+`vX.Y.Z` tag on its own, usually within a few days. Per release you only need the steps of
+"Making a GitHub release": the versionCode bump and the `changelogs/<versionCode>.txt` files.

@@ -1,5 +1,5 @@
 # Builds a signed release APK and publishes a GitHub Release when a version tag is pushed:
-#   git tag v0.5.2 && git push origin v0.5.2
+#   git tag v0.6.0 && git push origin v0.6.0
 # Release notes are taken from the matching section of CHANGELOG.md.
 # Required repository secrets (see docs/releasing.md):
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
@@ -20,37 +20,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      - run: npm ci
-      - run: npm run check
+      - uses: gradle/actions/setup-gradle@v4
 
-      - name: Check that the tag matches app.json
+      - name: Check that the tag matches versionName
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          APP=$(node -p "require('./app.json').expo.version")
+          APP=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           TAG=${GITHUB_REF_NAME#v}
-          if [ "$APP" != "$TAG" ]; then echo "app.json version $APP != tag $TAG"; exit 1; fi
+          if [ "$APP" != "$TAG" ]; then echo "versionName $APP != tag $TAG"; exit 1; fi
 
-      - name: Generate the native project
-        run: |
-          npx expo prebuild --platform android --no-install
-          # The default 512 MB metaspace runs out on CI and Gradle hangs; later lines win.
-          echo "" >> android/gradle.properties
-          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
-          echo "kotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g" >> android/gradle.properties
-
-      - name: Build release APK
-        working-directory: android
-        run: ./gradlew assembleRelease bundleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64
+      - name: Test and build
+        run: ./gradlew testDebugUnitTest assembleRelease bundleRelease --no-daemon
 
       - name: Sign APK
         env:
@@ -62,16 +47,16 @@ jobs:
           if [ -z "$KEYSTORE_BASE64" ]; then echo "::error::Signing secrets are not set (docs/releasing.md)"; exit 1; fi
           echo "$KEYSTORE_BASE64" | base64 -d > release.jks
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          VERSION=$(node -p "require('./app.json').expo.version")
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           OUT="wellness-$VERSION.apk"
-          "$BT/zipalign" -f -p 4 android/app/build/outputs/apk/release/app-release.apk aligned.apk
+          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
           "$BT/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD \
             --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD --out "$OUT" aligned.apk
           "$BT/apksigner" verify --print-certs "$OUT"
           sha256sum "$OUT" > "$OUT.sha256"
           # App bundle (.aab) for stores that prefer it (RuStore, AppGallery, Amazon).
           AAB="wellness-$VERSION.aab"
-          cp android/app/build/outputs/bundle/release/app-release.aab "$AAB"
+          cp app/build/outputs/bundle/release/app-release.aab "$AAB"
           jarsigner -keystore release.jks -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" "$AAB" "$KEY_ALIAS"
           rm release.jks aligned.apk
           echo "AAB=$AAB" >> "$GITHUB_ENV"
