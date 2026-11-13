@@ -27,6 +27,10 @@ object Actions {
 
   fun resetDonationPrompts() = updateMeta { it.copy(donationShown = emptyList()) }
 
+  fun markBackup() = updateMeta { it.copy(backupAt = System.currentTimeMillis()) }
+
+  fun postponeBackup() = updateMeta { it.copy(backupRemindedAt = System.currentTimeMillis()) }
+
   // ---- nutrition ------------------------------------------------------------------------
 
   fun logFood(food: Food, grams: Double, meal: String, date: String = todayKey(), pieces: Int? = null) {
@@ -120,6 +124,47 @@ object Actions {
 
   fun removePantryItem(id: String) = set { s -> s.copy(pantry = s.pantry.filterNot { it.id == id }) }
 
+  /** Whole lists at once (shared pantry sync). */
+  fun setShared(pantry: List<PantryItem>, shopping: List<ShoppingItem>, log: List<PantryOutcome>) =
+    set { it.copy(pantry = pantry, shopping = shopping, pantryLog = log.sortedBy { o -> o.at }.takeLast(1000)) }
+
+  /**
+   * Remove a used-up ([kind] eaten) or thrown-away (wasted) product and count it in the statistics
+   * under [outcomeId] (so it can be undone).
+   */
+  fun finishPantryItem(p: PantryItem, kind: String, outcomeId: String = uid(), by: String? = null) = set { s ->
+    val o = PantryOutcome(outcomeId, todayKey(), p.name, kind, if (kind == "wasted") p.left else 1.0, System.currentTimeMillis(), by)
+    s.copy(pantry = s.pantry.filterNot { it.id == p.id }, pantryLog = (s.pantryLog + o).takeLast(1000))
+  }
+
+  /** Undo [finishPantryItem]: the product comes back, the history entry goes. */
+  fun undoFinish(p: PantryItem, outcomeId: String) = set { s ->
+    s.copy(pantry = s.pantry.filterNot { it.id == p.id } + p, pantryLog = s.pantryLog.filterNot { it.id == outcomeId })
+  }
+
+  fun updateOutcome(o: PantryOutcome) = set { s -> s.copy(pantryLog = s.pantryLog.map { if (it.id == o.id) o else it }) }
+
+  fun removeOutcome(id: String) = set { s -> s.copy(pantryLog = s.pantryLog.filterNot { it.id == id }) }
+
+  fun restoreOutcome(o: PantryOutcome) = set { s -> if (s.pantryLog.any { it.id == o.id }) s else s.copy(pantryLog = s.pantryLog + o) }
+
+  /** Adds to the shopping list unless the same name is already waiting to be bought. */
+  fun addShopping(name: String) = set { s ->
+    val n = name.trim()
+    if (n.isEmpty() || s.shopping.any { it.boughtAt == null && it.name.equals(n, true) }) s
+    else s.copy(shopping = s.shopping + ShoppingItem(uid(), n, System.currentTimeMillis()))
+  }
+
+  /** Tick or untick as bought. */
+  fun toggleShopping(id: String) = set { s ->
+    s.copy(shopping = s.shopping.map { if (it.id == id) it.copy(boughtAt = if (it.boughtAt == null) System.currentTimeMillis() else null, hidden = false) else it })
+  }
+
+  /** Hide ticked items from the list; they are still offered for the pantry. */
+  fun clearBought() = set { s -> s.copy(shopping = s.shopping.map { if (it.boughtAt != null) it.copy(hidden = true) else it }) }
+
+  fun removeShopping(id: String) = set { s -> s.copy(shopping = s.shopping.filterNot { it.id == id }) }
+
   fun saveHealthRecord(r: HealthRecord) = set { s ->
     s.copy(health = if (s.health.any { it.id == r.id }) s.health.map { if (it.id == r.id) r else it } else s.health + r)
   }
@@ -137,7 +182,7 @@ object Actions {
       "steps" -> s.copy(steps = emptyMap())
       "heart" -> s.copy(heart = emptyList())
       "body" -> s.copy(body = emptyList())
-      "pantry" -> s.copy(pantry = emptyList())
+      "pantry" -> s.copy(pantry = emptyList(), shopping = emptyList(), pantryLog = emptyList())
       "health" -> s.copy(health = emptyList())
       else -> s
     }

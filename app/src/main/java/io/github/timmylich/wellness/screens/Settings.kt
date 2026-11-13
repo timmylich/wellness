@@ -8,10 +8,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,9 +25,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -39,6 +45,9 @@ import io.github.timmylich.wellness.lib.Backup
 import io.github.timmylich.wellness.lib.BackupError
 import io.github.timmylich.wellness.lib.FoodCache
 import io.github.timmylich.wellness.lib.HealthConnect
+import io.github.timmylich.wellness.lib.Reminders
+import io.github.timmylich.wellness.lib.humanDate
+import io.github.timmylich.wellness.lib.keyOf
 import io.github.timmylich.wellness.lib.TargetContext
 import io.github.timmylich.wellness.lib.Updates
 import io.github.timmylich.wellness.lib.bmr
@@ -55,6 +64,7 @@ import io.github.timmylich.wellness.ui.Field
 import io.github.timmylich.wellness.ui.HRow
 import io.github.timmylich.wellness.ui.Hint
 import io.github.timmylich.wellness.ui.HeightWheel
+import io.github.timmylich.wellness.ui.IconBadge
 import io.github.timmylich.wellness.ui.KgWheels
 import io.github.timmylich.wellness.ui.Labeled
 import io.github.timmylich.wellness.ui.YearWheel
@@ -352,6 +362,7 @@ private fun DataPage() {
   val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
     if (uri != null) run {
       Backup.export(ctx, uri)
+      Actions.markBackup()
       dict.t("settings.exported", Backup.fileName())
     }
   }
@@ -374,6 +385,9 @@ private fun DataPage() {
   Card {
     T(dict["settings.dataNote"], dim = true, size = 13)
     Button(dict["settings.export"], Modifier.fillMaxWidth(), icon = "database", enabled = !busy) { exportLauncher.launch(Backup.fileName()) }
+    Button(dict["settings.shareBackup"], Modifier.fillMaxWidth(), kind = "secondary", icon = "send", enabled = !busy) {
+      run { Backup.share(ctx); Actions.markBackup(); null }
+    }
     Button(dict["settings.import"], Modifier.fillMaxWidth(), kind = "secondary", enabled = !busy) {
       confirm(dict["settings.importTitle"], dict["settings.importText"], dict["common.cancel"], dict["common.yes"]) { importLauncher.launch(any) }
     }
@@ -415,5 +429,47 @@ private fun SupportPage() {
     Button(dict["donation.money"], Modifier.fillMaxWidth(), icon = "donate", subtitle = dict["donation.moneyHint"]) { Nav.push(Route.Support) }
     Button(dict["donation.star"], Modifier.fillMaxWidth(), kind = "secondary", icon = "star") { openUrl(ctx, Updates.REPO_URL) }
     Button(dict["donation.telegram"], Modifier.fillMaxWidth(), kind = "secondary", icon = "send") { openUrl(ctx, TELEGRAM_URL) }
+  }
+}
+
+/**
+ * Every 30 days without a backup: offer to save one (the file picker includes Google Drive) or send
+ * it (Telegram, mail…). With notifications on, a notification is scheduled for the same day too.
+ */
+@Composable
+fun BackupPrompt() {
+  val dict = L
+  val ctx = LocalContext.current
+  val scope = rememberCoroutineScope()
+  val meta = Store.data.meta
+  val due = Backup.dueAt(meta)
+  val notify = Store.data.settings.notifications.enabled
+  LaunchedEffect(due, notify) {
+    if (notify) Reminders.schedule(ctx, "backup", due, dict["settings.backupTitle"], dict["settings.backupNotif"]) else Reminders.cancel(ctx, "backup")
+  }
+  val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    if (uri != null) scope.launch {
+      runCatching { Backup.export(ctx, uri) }.onSuccess { Actions.markBackup() }.onFailure { showDialog(dict["common.error"], it.message ?: it.toString()) }
+    }
+  }
+  if (!meta.onboarded || System.currentTimeMillis() < due || pendingMilestone(meta.usageDays.size, meta.donationShown) != null) return
+  val last = meta.backupAt?.let { humanDate(keyOf(it), dict) } ?: dict["settings.backupNever"]
+  Dialog(onDismissRequest = { Actions.postponeBackup() }) {
+    Column(
+      Modifier.fillMaxWidth().background(c.card, RoundedCornerShape(24.dp)).padding(24.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      IconBadge("database", 56.dp, 28.dp, 18.dp)
+      T(dict["settings.backupTitle"], size = 20, bold = true, center = true)
+      T(dict.t("settings.backupText", last), dim = true, center = true)
+      Button(dict["settings.backupSave"], Modifier.fillMaxWidth(), icon = "download", subtitle = dict["settings.backupSaveHint"]) { save.launch(Backup.fileName()) }
+      Button(dict["settings.shareBackup"], Modifier.fillMaxWidth(), kind = "secondary", icon = "send") {
+        scope.launch {
+          runCatching { Backup.share(ctx) }.onSuccess { Actions.markBackup() }.onFailure { showDialog(dict["common.error"], it.message ?: it.toString()) }
+        }
+      }
+      Button(dict["settings.backupLater"], Modifier.fillMaxWidth(), kind = "ghost") { Actions.postponeBackup() }
+    }
   }
 }

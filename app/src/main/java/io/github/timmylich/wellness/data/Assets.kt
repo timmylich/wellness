@@ -27,7 +27,18 @@ data class Tip(val id: String, val title: String, val body: List<String>, val so
 data class TipCategory(val id: String, val title: String, val icon: String, val tips: List<Tip>)
 
 @Serializable
-data class ShelfBase(val id: String, val ru: String, val en: String, val days: Int, val match: List<String>)
+data class ShelfBase(
+  val id: String,
+  val ru: String,
+  val en: String,
+  val days: Int,
+  val match: List<String>,
+  /** Days in the fridge after opening (lower bound of the USDA FoodKeeper range); null: opening does not matter. */
+  val opened: Int? = null,
+  /** Typical package: the default amount in [unit] (g | ml | pcs). */
+  val amount: Double? = null,
+  val unit: String? = null,
+)
 
 @Serializable
 private data class WorkoutsFile(val builtin: List<WorkoutTemplate>, val en: Map<String, String>)

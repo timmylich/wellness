@@ -46,7 +46,7 @@ and asks for the keystore password. The result updates the installed app in plac
 2. In `CHANGELOG.md`, move the `[Unreleased]` notes under `## [x.y.z] — YYYY-MM-DD`. This
    section becomes the release description on GitHub, so write it for users.
 3. Add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` and `ru-RU/…` (up to
-   500 characters, plain text). F-Droid and IzzyOnDroid show them as "What's new".
+   500 characters, plain text). F-Droid shows them as "What's new".
 4. Check locally: `./gradlew testDebugUnitTest lintDebug`, then install with
    `./scripts/install-signed.ps1` and try the app.
 5. Commit, merge into `main`, tag and push:
@@ -72,31 +72,13 @@ creates a draft release for a dry run.
 
 ## IzzyOnDroid
 
-[IzzyOnDroid](https://apt.izzysoft.de/fdroid/) is an F-Droid-compatible repository that ships
-the APK from GitHub Releases as is (signed with our key), so it updates within a day of a
-GitHub release. Users add the repo in F-Droid, Droid-ify or Neo Store.
-
-One-time inclusion request:
-
-1. Make sure the latest GitHub release has the APK attached and the app meets the
-   [inclusion criteria](https://gitlab.com/IzzyOnDroid/repo/-/wikis/Inclusion-Policy): FOSS
-   license (AGPL-3.0), no proprietary libraries or trackers, APK under 30 MB.
-2. Open an issue at <https://gitlab.com/IzzyOnDroid/repo/-/issues> with the template
-   "Inclusion request", linking `https://github.com/timmylich/wellness`.
-3. Izzy scans the APK (libraries, permissions, network) and may ask questions in the issue;
-   answer there. Good to mention: optional network use (Open Food Facts, USDA, GitHub update
-   check), the foreground service for step counting, no Google Play services.
-4. The listing (title, descriptions, icon, screenshots, What's new) is read from
-   `fastlane/metadata/android/` in the repository; keep it current.
-
-After inclusion nothing is needed per release: a new GitHub release with a higher versionCode is
-picked up automatically. Never change the signing key: IzzyOnDroid (and users) would reject the
-update.
+Not available: IzzyOnDroid declined the app in 2026-11 under its policy on LLM-assisted
+development (the APK and metadata scans passed). Use F-Droid instead.
 
 ## F-Droid
 
 F-Droid builds the app from source on its own servers and signs it with **its own key**, so the
-F-Droid build cannot update a GitHub/IzzyOnDroid install (and vice versa); users pick one
+F-Droid build cannot update a GitHub install (and vice versa); users pick one
 source. The app has no proprietary dependencies (no Google Play services, no Firebase), and the
 store listing lives in `fastlane/metadata/android/` in the format F-Droid reads.
 

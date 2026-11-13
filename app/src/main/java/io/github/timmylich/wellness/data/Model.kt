@@ -237,6 +237,10 @@ data class Meta(
   val updateCheckedAt: Long? = null,
   val updateNotified: String? = null,
   val createdAt: Long = System.currentTimeMillis(),
+  /** Last backup saved or shared; the backup reminder counts 30 days from here. */
+  val backupAt: Long? = null,
+  /** Last time the backup reminder was postponed. */
+  val backupRemindedAt: Long? = null,
 )
 
 @Serializable
@@ -254,6 +258,35 @@ data class PantryItem(
   /** Fraction left, 0…1. */
   val left: Double = 1.0,
   val createdAt: Long = 0,
+  /** Day the package was opened (shortens the expiry date, see ShelfBase.opened). */
+  val openedAt: String? = null,
+)
+
+@Serializable
+data class ShoppingItem(
+  val id: String,
+  val name: String,
+  val createdAt: Long = 0,
+  /** When it was ticked as bought; bought items are offered for the pantry until added or dismissed. */
+  val boughtAt: Long? = null,
+  /** Bought and cleared from the shopping list (still offered for the pantry). */
+  val hidden: Boolean = false,
+)
+
+/** A pantry product that was used up or thrown away (pantry statistics). */
+@Serializable
+data class PantryOutcome(
+  val id: String,
+  val date: String,
+  val name: String,
+  /** eaten | wasted */
+  val kind: String,
+  /** Share of the package that was left when it was thrown away (1 for eaten). */
+  val share: Double = 1.0,
+  /** When it was marked (orders the history within a day). */
+  val at: Long = 0,
+  /** Who marked it, on a shared list. */
+  val by: String? = null,
 )
 
 @Serializable
@@ -286,6 +319,8 @@ data class AppData(
   val heart: List<HeartEntry> = emptyList(),
   val body: List<BodyEntry> = emptyList(),
   val pantry: List<PantryItem> = emptyList(),
+  val shopping: List<ShoppingItem> = emptyList(),
+  val pantryLog: List<PantryOutcome> = emptyList(),
   val health: List<HealthRecord> = emptyList(),
 )
 
@@ -307,5 +342,9 @@ fun AppData.normalized(builtinWorkouts: List<WorkoutTemplate>): AppData {
       stepsSource = if (settings.stepsSource == "healthConnect") "healthConnect" else "device",
     ),
     workoutTemplates = workoutTemplates.ifEmpty { builtinWorkouts },
+    // Finished items used to stay hidden at 0 %; they are removed now.
+    pantry = pantry.filter { it.left > 0 },
+    // Bought items cleared from the list stop being offered for the pantry after two weeks.
+    shopping = shopping.filterNot { it.hidden && (it.boughtAt ?: 0) < System.currentTimeMillis() - 14 * 86_400_000L },
   )
 }

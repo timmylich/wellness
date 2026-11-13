@@ -1,6 +1,9 @@
-/** Pantry (expiry dates) and Health records (doctor visits, lab tests, photos). */
+/** Health records (doctor visits, lab tests, photos). The pantry lives in Pantry.kt. */
 package io.github.timmylich.wellness.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -26,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import io.github.timmylich.wellness.data.Actions
 import io.github.timmylich.wellness.data.Assets
 import io.github.timmylich.wellness.data.HealthRecord
@@ -53,6 +58,7 @@ import io.github.timmylich.wellness.data.Per100
 import io.github.timmylich.wellness.data.Store
 import io.github.timmylich.wellness.data.uid
 import io.github.timmylich.wellness.i18n.Lang
+import io.github.timmylich.wellness.lib.PantryShare
 import io.github.timmylich.wellness.lib.Photos
 import io.github.timmylich.wellness.lib.Reminders
 import io.github.timmylich.wellness.lib.addDays
@@ -60,7 +66,10 @@ import io.github.timmylich.wellness.lib.atTime
 import io.github.timmylich.wellness.lib.daysBetween
 import io.github.timmylich.wellness.lib.foodTags
 import io.github.timmylich.wellness.lib.humanDate
+import io.github.timmylich.wellness.lib.keyOf
 import io.github.timmylich.wellness.lib.searchLocal
+import io.github.timmylich.wellness.lib.ShareError
+import io.github.timmylich.wellness.lib.timeLabel
 import io.github.timmylich.wellness.lib.todayKey
 import io.github.timmylich.wellness.ui.AppSheet
 import io.github.timmylich.wellness.ui.Bar
@@ -68,9 +77,11 @@ import io.github.timmylich.wellness.ui.Button
 import io.github.timmylich.wellness.ui.Card
 import io.github.timmylich.wellness.ui.Chip
 import io.github.timmylich.wellness.ui.DateStep
+import io.github.timmylich.wellness.ui.DialogButton
 import io.github.timmylich.wellness.ui.Empty
 import io.github.timmylich.wellness.ui.Field
 import io.github.timmylich.wellness.ui.H
+import io.github.timmylich.wellness.ui.HRow
 import io.github.timmylich.wellness.ui.Icon
 import io.github.timmylich.wellness.ui.IconBadge
 import io.github.timmylich.wellness.ui.L
@@ -85,6 +96,7 @@ import io.github.timmylich.wellness.ui.c
 import io.github.timmylich.wellness.ui.confirmDialog
 import io.github.timmylich.wellness.ui.fmt
 import io.github.timmylich.wellness.ui.numStr
+import io.github.timmylich.wellness.ui.showDialog
 import io.github.timmylich.wellness.ui.parseNum
 import io.github.timmylich.wellness.ui.tap
 import kotlinx.coroutines.delay
@@ -93,177 +105,6 @@ import java.io.File
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
-
-// ---- pantry ----------------------------------------------------------------------------
-
-/** How long a finished (0 %) item stays visible so the user can undo. */
-private const val REMOVE_DELAY_MS = 5000L
-
-fun daysLeft(p: PantryItem, today: String = todayKey()): Long = daysBetween(today, p.expiresAt)
-
-/** used: share of the shelf life that has passed; state: fresh | soon | expired. */
-fun freshness(p: PantryItem, today: String = todayKey()): Pair<Double, String> {
-  val total = max(1L, daysBetween(p.boughtAt, p.expiresAt))
-  val left = daysLeft(p, today)
-  val used = (1 - left.toDouble() / total).coerceIn(0.0, 1.0)
-  // "Close to expiry": the last quarter of the shelf life, or 2 days, whichever is longer.
-  val state = if (left < 0) "expired" else if (left <= max(2.0, total * 0.25)) "soon" else "fresh"
-  return used to state
-}
-
-/** Reminder at 10:00 the day before expiry, if enabled. */
-private fun scheduleReminder(ctx: android.content.Context, p: PantryItem, title: String, body: String) {
-  val n = Store.data.settings.notifications
-  Reminders.cancel(ctx, "pantry-${p.id}")
-  if (!n.enabled || !n.expiry || p.left <= 0) return
-  Reminders.schedule(ctx, "pantry-${p.id}", atTime(addDays(p.expiresAt, -1), 10, 0), title, body)
-}
-
-@Composable
-fun Pantry() {
-  val dict = L
-  val items = Store.data.pantry
-  var editing by remember { mutableStateOf<PantryItem?>(null) }
-  var adding by remember { mutableStateOf(false) }
-  // Finished items stay for a few seconds with a countdown; value: removal deadline.
-  val zeroed = remember { mutableStateMapOf<String, Long>() }
-  val sorted = items.filter { it.left > 0 || it.id in zeroed }.sortedBy { it.expiresAt }
-  Card {
-    H(dict["pantry.title"], "pantry", right = { T("+ ${dict["pantry.add"]}", Modifier.tap { adding = true }, color = c.accent) })
-    if (sorted.isEmpty()) Empty(dict["pantry.empty"])
-    for (p in sorted) androidx.compose.runtime.key(p.id) {
-      PantryRow(p, zeroed[p.id], { editing = p }, { zeroed[p.id] = System.currentTimeMillis() + REMOVE_DELAY_MS }, { zeroed.remove(p.id) })
-    }
-  }
-  Button(dict["pantry.add"], Modifier.fillMaxWidth(), icon = "plus", big = true) { adding = true }
-  T(dict["pantry.source"], dim = true, size = 11)
-  if (adding || editing != null) AppSheet({ adding = false; editing = null }) { PantryForm(editing, close) }
-  // Drop finished items once their countdown is over.
-  LaunchedEffect(zeroed.toMap()) {
-    val next = zeroed.values.minOrNull() ?: return@LaunchedEffect
-    delay(max(0, next - System.currentTimeMillis()))
-    zeroed.entries.removeAll { it.value <= System.currentTimeMillis() }
-  }
-}
-
-@Composable
-private fun PantryRow(item: PantryItem, removeAt: Long?, onEdit: () -> Unit, onZero: () -> Unit, onRevive: () -> Unit) {
-  val dict = L
-  val ctx = LocalContext.current
-  val (used, state) = freshness(item)
-  val color = when (state) {
-    "expired" -> c.danger
-    "soon" -> c.high
-    else -> c.ok
-  }
-  val tags = foodTags(item.per100g)
-  // Local copy while dragging; committed on release.
-  var draft by remember { mutableStateOf<Double?>(null) }
-  val left = draft ?: item.left
-  var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-  LaunchedEffect(removeAt) {
-    while (removeAt != null && now < removeAt) {
-      delay(250)
-      now = System.currentTimeMillis()
-    }
-  }
-  val leaving = removeAt != null && removeAt - now < 280
-  AnimatedVisibility(!leaving, exit = fadeOut() + slideOutHorizontally { it / 6 }) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-      Column(Modifier.tap(scaleTo = 1f, onClick = onEdit), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-          T(item.name, Modifier.weight(1f), bold = true)
-          T(dict.daysLeft(daysLeft(item)), size = 13, color = color)
-        }
-        // Freshness: how much of the shelf life has passed.
-        Bar(max(0.04, used).toFloat(), color, 6.dp)
-        if (tags.isNotEmpty()) Wrap(4.dp) {
-          for (t in tags) T(dict["pantry.tags.$t"], Modifier.background(c.accent.a(0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), size = 11, color = c.accent)
-        }
-      }
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        val amount = item.amountG?.let { " · ${fmt(left * it)} ${dict["pantry.units.${item.unit ?: "g"}"]}" } ?: ""
-        T("${dict["pantry.left"]}: ${(left * 100).roundToInt()}%$amount", Modifier.width(92.dp), dim = true, size = 12)
-        Box(Modifier.weight(1f)) {
-          Slider(left, 0.0, 1.0, 0.01, onChange = { draft = it }, haptics = false, onComplete = { v ->
-            draft = null
-            Actions.setPantryLeft(item.id, v)
-            if (v <= 0) {
-              onZero()
-              Reminders.cancel(ctx, "pantry-${item.id}")
-            } else onRevive()
-          })
-        }
-      }
-      if (removeAt != null && item.left <= 0) T(dict.t("pantry.removeIn", max(0L, ceil((removeAt - now) / 1000.0).toLong())), size = 12, color = c.danger)
-    }
-  }
-}
-
-@Composable
-private fun PantryForm(item: PantryItem?, onDone: () -> Unit) {
-  val dict = L
-  val ctx = LocalContext.current
-  val lang = dict.lang
-  var name by remember { mutableStateOf(item?.name ?: "") }
-  var baseId by remember { mutableStateOf(item?.baseId) }
-  var per100 by remember { mutableStateOf<Per100?>(item?.per100g) }
-  var bought by remember { mutableStateOf(item?.boughtAt ?: todayKey()) }
-  var expires by remember { mutableStateOf(item?.expiresAt) }
-  var amount by remember { mutableStateOf(numStr(item?.amountG)) }
-  var unit by remember { mutableStateOf(item?.unit ?: "g") }
-  var showDb by remember { mutableStateOf(false) }
-  val base = Assets.shelfBase(baseId) ?: Assets.guessBase(name) ?: Assets.shelfBase("other")!!
-  // Until the user sets a date, it follows the product type.
-  val expiry = expires ?: addDays(bought, base.days)
-  val userFoods = Store.data.foods
-  val matches = remember(showDb, name, userFoods, lang) { if (showDb && name.trim().length >= 2) searchLocal(name.trim(), userFoods, lang).take(5) else emptyList() }
-  val baseName = { b: io.github.timmylich.wellness.data.ShelfBase -> if (lang == Lang.Ru) b.ru else b.en }
-
-  SheetTitle(if (item != null) dict["pantry.edit"] else dict["pantry.add"])
-  Field(name, { name = it; showDb = true }, Modifier.fillMaxWidth(), label = dict["pantry.name"], numeric = false, placeholder = dict["pantry.namePh"], search = true)
-  if (matches.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-    T(dict["pantry.fromDb"], dim = true, size = 12)
-    for (f in matches) T(f.name, Modifier.fillMaxWidth().tap(scaleTo = 1f) {
-      name = f.name
-      per100 = f.per100g
-      showDb = false
-    }.padding(vertical = 6.dp), size = 14)
-  }
-  T(dict["pantry.base"], dim = true, size = 13)
-  Wrap(6.dp) {
-    for (b in Assets.shelfBases) Chip(baseName(b), active = base.id == b.id) {
-      baseId = b.id
-      // Empty name: use the product type as the name.
-      if (name.isBlank()) name = baseName(b)
-      expires = null
-    }
-  }
-  T(dict.t("pantry.baseHint", base.days), dim = true, size = 12)
-  DateStep(dict["pantry.bought"], bought) { bought = it }
-  DateStep(dict["pantry.expires"], expiry) { expires = it }
-  Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    Field(amount, { amount = it }, Modifier.weight(1f), label = dict["pantry.amount"], suffix = dict["pantry.units.$unit"])
-    Segmented(unit, listOf("g", "ml", "pcs").map { it to dict["pantry.units.$it"] }) { unit = it }
-  }
-  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    if (item != null) Button(dict["pantry.remove"], Modifier.weight(1f), kind = "danger") {
-      Reminders.cancel(ctx, "pantry-${item.id}")
-      Actions.removePantryItem(item.id)
-      onDone()
-    }
-    Button(dict["pantry.save"], Modifier.weight(2f), enabled = name.isNotBlank()) {
-      if (name.isBlank()) return@Button
-      val p = PantryItem(
-        id = item?.id ?: uid(), name = name.trim(), baseId = base.id, per100g = per100, boughtAt = bought, expiresAt = expiry,
-        amountG = parseNum(amount), unit = unit, left = item?.left ?: 1.0, createdAt = item?.createdAt ?: System.currentTimeMillis(),
-      )
-      Actions.savePantryItem(p)
-      scheduleReminder(ctx, p, dict["pantry.notifTitle"], dict.t("pantry.notifBody", p.name))
-      onDone()
-    }
-  }
-}
 
 // ---- health records --------------------------------------------------------------------
 

@@ -96,15 +96,15 @@ private fun Tabs() {
       HorizontalPager(
         pager,
         Modifier.weight(1f),
-        // The section pager inside Overview owns horizontal swipes there.
-        userScrollEnabled = pager.currentPage != overview,
+        // The pagers inside Overview and Pantry own horizontal swipes there.
+        userScrollEnabled = tabs[pager.currentPage] != "overview" && tabs[pager.currentPage] != "pantry",
         beyondViewportPageCount = jump.beyond,
         key = { tabs[it] },
       ) { i ->
         androidx.compose.foundation.layout.Box(jump.page(i)) {
         when (tabs[i]) {
           "tips" -> Tips()
-          "pantry" -> TabPage(L["tabs.pantry"]) { Pantry() }
+          "pantry" -> Pantry()
           "overview" -> Overview()
           "health" -> TabPage(L["tabs.health"]) { Health() }
           else -> More()

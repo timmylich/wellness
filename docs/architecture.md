@@ -72,4 +72,13 @@ UI text. A unit test checks that every key the code uses exists in both language
   5 minutes; while Health Connect is missing or not connected the device counter is used.
 - Notifications (`lib/System.kt`, `Reminders`): local only, AlarmManager, no Firebase. See
   [notifications.md](notifications.md).
-- Backups (`lib/Backup.kt`): Storage Access Framework; photos of health records travel as base64.
+- Backups (`lib/Backup.kt`): Storage Access Framework or the share sheet; photos of health records
+  travel as base64. A reminder offers a backup every 30 days (`BackupPrompt`).
+- Pantry tab (`screens/Pantry.kt`): three swipeable pages — products with expiry, opened state
+  (`ShelfBase.opened`), typical package sizes and counts; the shopping list (bought items are
+  offered back on the first page); statistics, history (`AppData.pantryLog`) and family members.
+- Shared pantry (`lib/PantryShare.kt`, server `supabase/pantry-share.sql`): a 16-character code;
+  the pantry and shopping lists are AES-GCM encrypted on the phone and stored in Supabase under a hash of the code.
+  Sync is a 3-way merge with optimistic versions; the server rate-limits and deletes lists idle
+  for 7 days. The code is kept in SharedPreferences, outside AppData and backups. Configure with
+  `supabaseUrl` / `supabaseKey` Gradle properties; without them the feature is hidden.

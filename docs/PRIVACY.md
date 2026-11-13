@@ -1,6 +1,6 @@
 # Privacy policy — Wellness
 
-_Last updated: 2026-10-14_
+_Last updated: 2026-11-13_
 
 Wellness is an open-source health tracker developed by an individual developer
 (contact: [t.me/timmylich_portfolio](https://t.me/timmylich_portfolio),
@@ -10,7 +10,8 @@ Wellness is an open-source health tracker developed by an individual developer
 
 Everything you enter — profile (sex, age, height, weight), food log, water, steps, workouts,
 blood pressure, body measurements, pantry items, health records and their photos — is stored
-**only on your device**. There are no accounts, no servers of ours, no analytics, no
+**only on your device**, except the pantry list when you turn on sharing (below). There are no
+accounts, no servers of ours, no analytics, no
 advertising and no tracking SDKs.
 
 ## Network requests
@@ -21,9 +22,10 @@ All of them are optional and can be turned off in settings:
 | --- | --- | --- |
 | Food search | Open Food Facts, USDA FoodData Central | the search text or barcode |
 | Update check | GitHub (api.github.com) | a request for the latest release; nothing about you |
+| Shared pantry (only after you create or enter a code) | Supabase (hosted database) | the pantry and shopping lists, encrypted on the phone with a key derived from the code; the server sees only ciphertext and a hash of the code. Deleted after 7 days without use |
 
 These services receive your IP address as part of any internet request; see their own privacy
-policies. No health data is ever sent.
+policies. No other health data is ever sent.
 
 ## Permissions
 
@@ -57,8 +59,11 @@ Wellness — приложение с открытым кодом от частн
 серверов, аналитики, рекламы и трекеров.
 
 Сетевые запросы — только по желанию и отключаются в настройках: поиск продуктов (Open Food
-Facts, USDA — передаётся только текст запроса или штрихкод) и проверка обновлений на GitHub.
-Данные о здоровье никуда не передаются.
+Facts, USDA — передаётся только текст запроса или штрихкод), проверка обновлений на GitHub и
+совместный доступ к холодильнику (только после создания или ввода кода): списки продуктов и
+покупок шифруются на телефоне ключом из кода, сервер Supabase хранит только шифр и удаляет его через
+7 дней без использования.
+Другие данные о здоровье никуда не передаются.
 
 Разрешения: физическая активность (шаги), уведомления, камера и фото (только для прикрепления к
 записи), Health Connect (только чтение шагов, если выбрано).

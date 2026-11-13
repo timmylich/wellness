@@ -40,8 +40,10 @@ import io.github.timmylich.wellness.data.ThemeMode
 import io.github.timmylich.wellness.i18n.Dict
 import io.github.timmylich.wellness.i18n.resolveLang
 import io.github.timmylich.wellness.lib.HealthConnect
+import io.github.timmylich.wellness.lib.PantryShare
 import io.github.timmylich.wellness.lib.Updates
 import io.github.timmylich.wellness.screens.AppScreen
+import io.github.timmylich.wellness.screens.BackupPrompt
 import io.github.timmylich.wellness.screens.DonationPrompt
 import io.github.timmylich.wellness.screens.Onboarding
 import io.github.timmylich.wellness.steps.StepService
@@ -63,6 +65,7 @@ class WellnessApp : Application() {
     Assets.init(this)
     // Read saved data off the main thread while the first frame is prepared.
     Store.init(this)
+    PantryShare.init(this)
   }
 }
 
@@ -143,6 +146,7 @@ private fun Root() {
       LaunchedEffect(Unit) { Updates.maybeCheck(ctx, dict["settings.updateTitle"]) { dict.t("settings.updateBody", it) } }
       if (!meta.onboarded) Onboarding() else NavHost { AppScreen(it) }
       DonationPrompt()
+      BackupPrompt()
       DialogHost()
     }
   }

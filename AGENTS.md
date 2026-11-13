@@ -27,5 +27,6 @@ Bundled data and UI strings: `app/src/main/assets/`. See `docs/architecture.md`.
 - All persisted state is `AppData` (`data/Model.kt`); mutate only through `data/Actions.kt`.
   The JSON format must stay compatible with older backups (including 0.5.x React Native ones).
 - No analytics, ads or trackers, no Google Play services/Firebase. Network access is limited to
-  the optional food search (Open Food Facts, USDA) and the optional GitHub Releases update check.
+  the optional food search (Open Food Facts, USDA), the optional GitHub Releases update check and
+  the optional shared pantry (Supabase, end-to-end encrypted; `lib/PantryShare.kt`).
 - Prefer platform APIs and existing helpers over new dependencies.

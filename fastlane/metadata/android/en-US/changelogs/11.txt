@@ -1,0 +1,6 @@
+Shared pantry for the family: one code, no accounts, end-to-end encrypted.
+• Shopping list; bought items are offered for the pantry.
+• Eaten / thrown away, 30-day waste statistics and an editable history.
+• "Package opened" shortens the expiry date; typical package sizes; −/+ for pieces.
+• Swipe between At home, Shopping and Statistics.
+• Backup reminder every 30 days; send a backup to Telegram or Google Drive.

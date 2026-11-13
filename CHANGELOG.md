@@ -6,6 +6,44 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-13
+
+The pantry grows into a small household tool: a shared list for the family, a shopping list,
+and statistics on what gets eaten and what gets thrown away.
+
+**Why update**
+- **Share with family** — one code connects several phones, without accounts. The pantry,
+  shopping list and history stay in step within seconds. Everything is encrypted on the phone:
+  the server stores only ciphertext and never sees the code.
+- **Shopping list** — tick what you bought, then add it to the pantry with a date and amount.
+- **Less waste** — mark products as eaten or thrown away and see your waste share for 30 days.
+- **Backups made easy** — a reminder every 30 days, with saving to Google Drive or sending to
+  Telegram in one tap.
+
+**Install**: download `wellness-0.7.0.apk` below and open it on your phone; it updates 0.6.0
+in place and keeps all data. Not a medical device.
+
+### Added
+- Shared pantry: create a 16-character code or enter one; merge or replace your list when
+  joining. End-to-end encrypted (AES-GCM), synced about every 30 seconds while the pantry is
+  open. Members are listed by name with their latest change. A shared list unused for 7 days is
+  deleted from the server; your phone keeps its data and shows a notice.
+- Pantry pages "At home", "Shopping" and "Statistics", switched by swiping.
+- Shopping list with an animated tick, a "Bought" section and "Clear ticked". Bought items are
+  offered on the "At home" page, where you set the amount and date or add them as is.
+- "Eaten" and "Thrown away" when a product reaches 0 % (or from its card). The product stays on
+  screen for a few seconds with "To shopping list" and "Undo".
+- Statistics for 30 days: eaten, thrown away, waste share and the most thrown-away products;
+  a history you can edit or delete, shared with the family.
+- "Package opened" shortens the expiry date by product type (USDA FoodKeeper).
+- Typical package size per product type (bread 400 g, milk 1000 ml, eggs 10 pcs…), the "pack"
+  unit, and −/+ buttons for pieces and packs.
+- Backup reminder every 30 days (also as a notification when notifications are on) and
+  "Send a backup" to Telegram, Google Drive, mail and other apps.
+
+### Changed
+- Finished products (0 %) are removed after 10 seconds instead of staying hidden in the data.
+
 ## [0.6.0] — 2026-11-08
 
 Wellness is rewritten as a fully native Android app (Kotlin, Jetpack Compose) instead of

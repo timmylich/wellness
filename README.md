@@ -62,10 +62,13 @@
 - **Body** — weight trend (time-weighted average), body fat (measured, US Navy or BMI-based
   estimate), BMI, waist-to-height ratio, healthy weight range.
 - **Pantry** (optional) — what you have at home, purchase and expiry dates, a freshness bar,
-  how much is left, nutrition tags and a reminder the day before a product expires.
+  opened packages, how much is left and a reminder the day before a product expires; a shopping
+  list, eaten / thrown-away statistics and history. Share it with your family through one code:
+  no accounts, end-to-end encrypted.
 - **Tips** — fresh air, drinking water, cancer prevention, sun, back health, sleep, nutrition.
 - **Yours to configure** — English and Russian, sections on/off, theme and accent colour,
-  animations, goal pace slider, custom nutrient limits, JSON export/import.
+  animations, goal pace slider, custom nutrient limits, JSON export/import with a reminder
+  every 30 days (save to Google Drive or send to Telegram).
 
 Every formula and limit cites its source (WHO, IOM/EFSA, ACC/AHA, USDA…) in
 [`Calc.kt`](app/src/main/java/io/github/timmylich/wellness/lib/Calc.kt) and is covered by unit tests.
@@ -78,12 +81,14 @@ notify you about new versions (Settings → Notifications). An F-Droid listing i
 
 ## Privacy
 
-All data is stored only on the device. Optional network requests:
+All data is stored only on the device, except the pantry when you turn on sharing. Optional
+network requests:
 
 | Request | What is sent | Can be turned off |
 | --- | --- | --- |
 | Food search (Open Food Facts, USDA) | the search text or barcode | Settings → Food |
 | Update check (GitHub Releases) | nothing but a request to `api.github.com` | Settings → Notifications |
+| Shared pantry (Supabase), only after you create or enter a code | the pantry, shopping list and history, AES-GCM encrypted on the phone with a key from the code; the server sees ciphertext and a hash of the code only, and deletes lists unused for 7 days | Pantry → Sharing → Disconnect |
 
 Health Connect access is optional and read-only (steps). There are no analytics, crash
 reporters, ads or Google Play services in the app.
@@ -170,8 +175,10 @@ Icons: Lucide (ISC).
   шаблоны тренировок.
 - **Сердце**: давление и пульс, классификация, пульсовые зоны.
 - **Тело**: вес со взвешенным средним, % жира, талия, ИМТ, подходящий вес.
-- **Продукты** (по желанию): что есть дома, сроки годности, полоса свежести, сколько осталось,
-  метки состава и напоминание за день до окончания срока.
+- **Продукты** (по желанию): что есть дома, сроки годности, полоса свежести, вскрытые
+  упаковки, сколько осталось и напоминание за день до окончания срока; список покупок,
+  статистика «съедено / выброшено» и история. Можно вести вместе с семьёй по одному коду — без
+  регистрации, со сквозным шифрованием.
 - **Советы**: воздух, вода, профилактика рака, солнце, спина, сон.
 
 **Установка**: скачайте APK со страницы [Releases](https://github.com/timmylich/wellness/releases/latest).

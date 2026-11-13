@@ -36,17 +36,38 @@ class BackupError(val key: String) : Exception(key)
 object Backup {
   fun fileName() = "wellness-backup-${todayKey()}.json"
 
-  /** Writes the backup to a document the user picked (CreateDocument). */
-  suspend fun export(c: Context, target: Uri) = withContext(Dispatchers.IO) {
-    val data = Store.data
+  /** The backup reminder is due 30 days after the last backup or postponement (or the first start). */
+  fun dueAt(m: io.github.timmylich.wellness.data.Meta): Long = maxOf(m.backupAt ?: m.createdAt, m.backupRemindedAt ?: 0) + 30 * 86_400_000L
+
+  private fun text(data: AppData): ByteArray {
     val photos = HashMap<String, JsonPrimitive>()
     for (uri in data.health.flatMap { it.photos }) {
       val f = Photos.file(uri) ?: continue
       if (f.exists()) photos[Photos.name(uri)] = JsonPrimitive(Base64.encodeToString(f.readBytes(), Base64.NO_WRAP))
     }
     val obj = json.encodeToJsonElement(AppData.serializer(), data).jsonObject
-    val text = JsonObject(obj + ("photoFiles" to JsonObject(photos))).toString()
-    c.contentResolver.openOutputStream(target, "wt")!!.use { it.write(text.toByteArray()) }
+    return JsonObject(obj + ("photoFiles" to JsonObject(photos))).toString().toByteArray()
+  }
+
+  /** Writes the backup to a document the user picked (CreateDocument). */
+  suspend fun export(c: Context, target: Uri) = withContext(Dispatchers.IO) {
+    val bytes = text(Store.data)
+    c.contentResolver.openOutputStream(target, "wt")!!.use { it.write(bytes) }
+  }
+
+  /** Writes the backup to the cache and opens the share sheet (Telegram, Google Drive, mail…). */
+  suspend fun share(c: Context) {
+    val data = Store.data
+    val uri = withContext(Dispatchers.IO) {
+      val bytes = text(data)
+      // Only the latest shared backup is kept; older ones are deleted.
+      val dir = File(c.cacheDir, "backup").apply { deleteRecursively(); mkdirs() }
+      val f = File(dir, fileName()).apply { writeBytes(bytes) }
+      androidx.core.content.FileProvider.getUriForFile(c, "${c.packageName}.files", f)
+    }
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("application/json")
+      .putExtra(android.content.Intent.EXTRA_STREAM, uri).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    c.startActivity(android.content.Intent.createChooser(send, fileName()))
   }
 
   private fun readJson(c: Context, uri: Uri) =
