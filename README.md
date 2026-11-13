@@ -23,6 +23,7 @@
 
 <p align="center">
   <a href="https://github.com/timmylich/wellness/releases/latest"><b>⬇ Download APK</b></a> ·
+  <a href="https://timmylich.github.io/wellness/">🌐 Website</a> ·
   <a href="#support-the-project">❤ Support</a> ·
   <a href="#по-русски">🇷🇺 По-русски</a>
 </p>
@@ -182,6 +183,7 @@ Icons: Lucide (ISC).
 - **Советы**: воздух, вода, профилактика рака, солнце, спина, сон.
 
 **Установка**: скачайте APK со страницы [Releases](https://github.com/timmylich/wellness/releases/latest).
+Сайт проекта: [timmylich.github.io/wellness/ru/](https://timmylich.github.io/wellness/ru/).
 
 **Поддержать автора**: ⭐ [звезда на GitHub](https://github.com/timmylich/wellness) ·
 💳 Tribute — карты, крипта, СБП ([в Telegram](https://t.me/tribute/app?startapp=dRVs),

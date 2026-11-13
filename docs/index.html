@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wellness — free open-source health tracker for Android: calories, water, steps</title>
+<meta name="description" content="Private Android health tracker without ads or accounts: calorie and nutrient counter, water tracker, step counter, blood pressure log, weight and body fat, pantry with expiry dates. Open source, 1.8 MB, works offline.">
+<meta name="keywords" content="health tracker, calorie counter, water tracker, step counter, pedometer, blood pressure log, weight tracker, pantry expiry tracker, open source, Android, no ads, offline, F-Droid">
+<link rel="canonical" href="https://timmylich.github.io/wellness/">
+<link rel="alternate" hreflang="en" href="https://timmylich.github.io/wellness/">
+<link rel="alternate" hreflang="ru" href="https://timmylich.github.io/wellness/ru/">
+<link rel="alternate" hreflang="x-default" href="https://timmylich.github.io/wellness/">
+<meta name="theme-color" content="#0b0d0e">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Wellness">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:title" content="Wellness — private health tracker for Android">
+<meta property="og:description" content="Food, water, steps, blood pressure, weight and pantry. No ads, no accounts, no Google services. Free and open source.">
+<meta property="og:url" content="https://timmylich.github.io/wellness/">
+<meta property="og:image" content="https://timmylich.github.io/wellness/assets/og.png">
+<meta property="og:image:width" content="1024">
+<meta property="og:image:height" content="500">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="stylesheet" href="assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Wellness",
+  "description": "Private, offline-first health tracker for Android: food and nutrients, water, steps and workouts, blood pressure, body composition, pantry with expiry dates and health tips.",
+  "applicationCategory": "HealthApplication",
+  "operatingSystem": "Android 8.0+",
+  "url": "https://timmylich.github.io/wellness/",
+  "downloadUrl": "https://github.com/timmylich/wellness/releases/latest",
+  "installUrl": "https://github.com/timmylich/wellness/releases/latest",
+  "fileSize": "1.8 MB",
+  "image": "https://timmylich.github.io/wellness/logo.png",
+  "screenshot": "https://timmylich.github.io/wellness/screenshots/summary.jpg",
+  "inLanguage": ["en", "ru"],
+  "isAccessibleForFree": true,
+  "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "timmylich", "url": "https://github.com/timmylich" },
+  "codeRepository": "https://github.com/timmylich/wellness"
+}
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="./"><img src="assets/icon-180.png" width="36" height="36" alt="">Wellness</a>
+    <nav>
+      <a class="opt" href="#features">Features</a>
+      <a class="opt" href="#support">Support</a>
+      <a href="ru/" hreflang="ru" lang="ru">Русский</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>A private health tracker for Android</h1>
+      <p class="lead">Count calories and nutrients, drink enough water, track steps, blood pressure and
+        weight, and keep your pantry fresh. Free, open source, and your data never leaves your phone.</p>
+      <a class="btn primary" href="https://github.com/timmylich/wellness/releases/latest">Download APK</a>
+      <a class="btn" href="https://github.com/timmylich/wellness">Source code on GitHub</a>
+      <p class="badges">No ads · No accounts · No analytics · No Google services · Android 8.0+</p>
+    </section>
+
+    <div class="shots" aria-label="Screenshots">
+      <a href="screenshots/summary.jpg"><img src="assets/summary.webp" width="216" height="460" alt="Daily summary: calories, water, steps and 7-day energy balance"></a>
+      <a href="screenshots/add_food.jpg"><img src="assets/add_food.webp" width="216" height="460" alt="Adding food from the offline database and Open Food Facts"></a>
+      <a href="screenshots/heart.jpg"><img src="assets/heart.webp" width="216" height="460" alt="Blood pressure and pulse log with ACC/AHA classification" loading="lazy"></a>
+      <a href="screenshots/pantry.jpg"><img src="assets/pantry.webp" width="216" height="460" alt="Pantry with expiry dates and a freshness bar" loading="lazy"></a>
+      <a href="screenshots/pantry_add_product.jpg"><img src="assets/pantry_add_product.webp" width="216" height="460" alt="Adding a product to the pantry" loading="lazy"></a>
+      <a href="screenshots/tips.jpg"><img src="assets/tips.webp" width="216" height="460" alt="Health tips with sources" loading="lazy"></a>
+      <a href="screenshots/more.jpg"><img src="assets/more.webp" width="216" height="460" alt="Settings: sections, theme, language, backups" loading="lazy"></a>
+    </div>
+
+    <section id="speed">
+      <h2>Fast and light</h2>
+      <div class="stats">
+        <div class="stat"><b>&lt; 0.5 s</b><span>cold start</span></div>
+        <div class="stat"><b>1.8 MB</b><span>APK size</span></div>
+        <div class="stat"><b>3×</b><span>faster than the previous React Native version</span></div>
+        <div class="stat"><b>0</b><span>trackers, ads and Google Play services</span></div>
+      </div>
+      <p>Wellness is a native Kotlin and Jetpack Compose app: no JavaScript engine, no heavy SDKs,
+        hand-drawn charts and smooth swipes even on budget phones. It works fully offline.</p>
+    </section>
+
+    <section id="features">
+      <h2>Everything for everyday health in one app</h2>
+      <div class="grid">
+        <div class="card"><h3>Calorie and nutrient counter</h3><p>12 daily scales — calories, protein, fat, carbs, sugar, added sugar, sodium, fibre, saturated and trans fat, cholesterol, potassium — with a personal minimum, target and maximum based on your profile, goal pace and activity.</p></div>
+        <div class="card"><h3>Quick food logging without AI</h3><p>Recent foods, favourites, an offline database (CIS dishes and ~2300 European foods from ANSES-CIQUAL), Open Food Facts and USDA search, barcodes, counting by pieces and custom foods.</p></div>
+        <div class="card"><h3>Energy balance</h3><p>Intake versus expenditure (BMR × lifestyle + workouts + steps), with surplus or deficit converted into estimated fat mass and optional adaptive targets.</p></div>
+        <div class="card"><h3>Water tracker</h3><p>One big button for water and one for other drinks, charts up to a year, a recommended range and a clearly marked dangerous amount.</p></div>
+        <div class="card"><h3>Step counter and workouts</h3><p>Background step counting with the phone's hardware sensor — no Google Fit needed — or Health Connect, plus MET-based workout templates.</p></div>
+        <div class="card"><h3>Blood pressure and pulse</h3><p>A blood pressure log with ACC/AHA classification and heart-rate zones.</p></div>
+        <div class="card"><h3>Weight and body composition</h3><p>Weight trend with a time-weighted average, body fat (measured, US Navy or BMI-based), BMI, waist-to-height ratio and a healthy weight range.</p></div>
+        <div class="card"><h3>Pantry and shopping list</h3><p>What you have at home, expiry dates, opened packages, a reminder before a product expires, a shopping list and eaten / thrown-away statistics. Share it with your family through one code, end-to-end encrypted.</p></div>
+        <div class="card"><h3>Health tips with sources</h3><p>Fresh air, water, cancer prevention, sun, back health, sleep and nutrition. Every formula and limit cites WHO, IOM/EFSA, ACC/AHA or USDA and is covered by tests.</p></div>
+      </div>
+    </section>
+
+    <section id="privacy">
+      <h2>Your data stays on your phone</h2>
+      <div class="grid">
+        <div class="card"><h3>No accounts</h3><p>No sign-up, no e-mail, no cloud profile. Everything is stored in one file on the device.</p></div>
+        <div class="card"><h3>Network only when you ask</h3><p>Food search, the update check and the shared pantry are optional and can be turned off. Nothing else goes online.</p></div>
+        <div class="card"><h3>Your backups</h3><p>JSON export and import with a reminder every 30 days — save it to your drive or send it to a messenger. <a href="PRIVACY">Privacy policy</a>.</p></div>
+      </div>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <p>Download the APK from <a href="https://github.com/timmylich/wellness/releases/latest">GitHub Releases</a>
+        and open it on your phone, allowing installs from your browser or file manager when asked.
+        The app can notify you about new versions. An F-Droid listing is planned.</p>
+      <a class="btn primary" href="https://github.com/timmylich/wellness/releases/latest">Download the latest version</a>
+    </section>
+
+    <section id="support">
+      <h2>Support the project</h2>
+      <p>Wellness is free and built in spare time. If it helps you, here is how you can help back:</p>
+      <div class="grid">
+        <div class="card"><h3>Donate</h3><p>Via Tribute — cards, crypto, SBP:
+          <a href="https://t.me/tribute/app?startapp=dRVs">in Telegram</a> ·
+          <a href="https://web.tribute.tg/d/RVs">in the browser</a>.</p></div>
+        <div class="card"><h3>Star and share</h3><p><a href="https://github.com/timmylich/wellness">Star the repository</a> and tell a friend — it helps others find the app.</p></div>
+        <div class="card"><h3>Contribute</h3><p>Code, translations, food data and health tips are welcome — see the <a href="https://github.com/timmylich/wellness/blob/main/CONTRIBUTING.md">contributing guide</a>. Found a bug? <a href="https://github.com/timmylich/wellness/issues">Open an issue</a>.</p></div>
+        <div class="card"><h3>Follow the author</h3><p>News and other projects on Telegram: <a href="https://t.me/timmylich_portfolio">@timmylich_portfolio</a>.</p></div>
+      </div>
+      <details>
+        <summary>Crypto addresses</summary>
+        <table>
+          <tr><th>Ethereum and EVM (BNB Chain, Base, Arbitrum, Optimism, Polygon)</th><td><code>0xe790989b801ddbc706f391b10bec0e6c1a1fd334</code></td></tr>
+          <tr><th>Solana</th><td><code>HJq4ocLn8eua95WKQs82N4hZ2S7VABANefTrSoUqo6rb</code></td></tr>
+          <tr><th>TRON</th><td><code>TMKejJ5a5unasnZiVZ1Vz8GvkXsDj7mvPE</code></td></tr>
+          <tr><th>TON</th><td><code>UQCOymZAvj5ho73JlD1s1-qo-pD-bqIQ-H_Y4FEjX7Sp68rI</code></td></tr>
+        </table>
+        <p>Double-check the network before sending.</p>
+      </details>
+    </section>
+
+    <section id="faq">
+      <h2>FAQ</h2>
+      <details><summary>Is Wellness really free?</summary><p>Yes. No ads, no subscriptions, no paid features. It is free software under the GNU AGPL v3 license.</p></details>
+      <details><summary>Does it work without Google Play services?</summary><p>Yes. It runs on any Android 8.0+ phone, including de-Googled ROMs such as LineageOS, GrapheneOS and /e/OS.</p></details>
+      <details><summary>Does it need the internet?</summary><p>No. All features work offline. Online food search and the shared pantry are optional.</p></details>
+      <details><summary>Which languages are supported?</summary><p>English and Russian.</p></details>
+      <details><summary>Is it a medical device?</summary><p>No. Recommendations are general guidelines for healthy adults and do not replace a doctor's advice.</p></details>
+    </section>
+  </main>
+
+  <footer>
+    <p>Wellness is free software licensed under the <a href="https://github.com/timmylich/wellness/blob/main/LICENSE">GNU AGPL v3</a>.
+      Food data: Open Food Facts (ODbL), ANSES-CIQUAL 2020 (Etalab Open Licence 2.0). Icons: Lucide (ISC).</p>
+    <p><a href="https://github.com/timmylich/wellness">GitHub</a> · <a href="PRIVACY">Privacy</a> ·
+      <a href="https://github.com/timmylich/wellness/blob/main/CHANGELOG.md">Changelog</a> ·
+      <a href="ru/" hreflang="ru" lang="ru">Версия на русском</a></p>
+  </footer>
+</div>
+</body>
+</html>
