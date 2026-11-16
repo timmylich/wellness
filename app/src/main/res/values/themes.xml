@@ -5,4 +5,11 @@
     <item name="android:statusBarColor">@android:color/transparent</item>
     <item name="android:navigationBarColor">@android:color/transparent</item>
   </style>
+  <!-- Applied over AppTheme when the app's own theme is dark: the system copy / paste toolbar
+       picks its colours from android:isLightTheme. -->
+  <style name="AppTheme.Dark" parent="android:Theme.Material.NoActionBar">
+    <item name="android:windowBackground">@color/windowBg</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+  </style>
 </resources>

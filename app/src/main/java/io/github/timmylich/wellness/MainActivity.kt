@@ -41,6 +41,8 @@ import io.github.timmylich.wellness.i18n.Dict
 import io.github.timmylich.wellness.i18n.resolveLang
 import io.github.timmylich.wellness.lib.HealthConnect
 import io.github.timmylich.wellness.lib.PantryShare
+import io.github.timmylich.wellness.lib.Today
+import io.github.timmylich.wellness.lib.msToMidnight
 import io.github.timmylich.wellness.lib.Updates
 import io.github.timmylich.wellness.screens.AppScreen
 import io.github.timmylich.wellness.screens.BackupPrompt
@@ -49,6 +51,8 @@ import io.github.timmylich.wellness.screens.Onboarding
 import io.github.timmylich.wellness.steps.StepService
 import io.github.timmylich.wellness.steps.StepStore
 import io.github.timmylich.wellness.ui.DialogHost
+import io.github.timmylich.wellness.ui.Toast
+import io.github.timmylich.wellness.ui.ToastHost
 import io.github.timmylich.wellness.ui.LocalDict
 import io.github.timmylich.wellness.ui.LocalMotion
 import io.github.timmylich.wellness.ui.LocalPalette
@@ -66,6 +70,7 @@ class WellnessApp : Application() {
     // Read saved data off the main thread while the first frame is prepared.
     Store.init(this)
     PantryShare.init(this)
+    PantryShare.rewatch(this)
   }
 }
 
@@ -137,17 +142,40 @@ private fun Root() {
     val bar = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT) else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
     activity.enableEdgeToEdge(bar, bar)
     activity.window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(pal.bg.toArgb()))
+    // System popups drawn from the activity theme (text copy / paste toolbar) follow the app theme.
+    activity.setTheme(if (dark) R.style.AppTheme_Dark else R.style.AppTheme)
   }
-  CompositionLocalProvider(LocalPalette provides pal, LocalDict provides dict, LocalMotion provides s.animations) {
+  val selection = remember(pal.accent) { androidx.compose.foundation.text.selection.TextSelectionColors(pal.accent, pal.accent.copy(alpha = 0.35f)) }
+  CompositionLocalProvider(
+    LocalPalette provides pal, LocalDict provides dict, LocalMotion provides s.animations,
+    androidx.compose.foundation.text.selection.LocalTextSelectionColors provides selection,
+  ) {
     Box(Modifier.fillMaxSize().background(pal.bg)) {
       if (!Store.ready) return@Box
       val meta = Store.data.meta
       StepTracking(meta.onboarded && s.section("activity"), s.stepsSource)
-      LaunchedEffect(Unit) { Updates.maybeCheck(ctx, dict["settings.updateTitle"]) { dict.t("settings.updateBody", it) } }
+      // A new day while the app is open or in the background: per-day screens follow it.
+      val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+      LaunchedEffect(Unit) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+          while (isActive) {
+            Today.refresh()
+            delay(msToMidnight() + 1000)
+          }
+        }
+      }
+      // Shopping items from the other phones: a note while open, a notification in the background.
+      val n = s.notifications
+      LaunchedEffect(n.enabled && n.shopping, PantryShare.code, dict) {
+        PantryShare.onIncoming = { names -> Toast.show(dict.t("pantry.share.incomingToast", names.joinToString(", "))) }
+        PantryShare.watch(ctx, n.enabled && n.shopping, dict.lang.code)
+      }
+      LaunchedEffect(Unit) { Updates.maybeCheck(ctx, dict) }
       if (!meta.onboarded) Onboarding() else NavHost { AppScreen(it) }
       DonationPrompt()
       BackupPrompt()
       DialogHost()
+      ToastHost()
     }
   }
 }

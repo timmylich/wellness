@@ -41,6 +41,7 @@ import io.github.timmylich.wellness.data.SECTION_IDS
 import io.github.timmylich.wellness.data.Sex
 import io.github.timmylich.wellness.data.Store
 import io.github.timmylich.wellness.data.ThemeMode
+import io.github.timmylich.wellness.lib.PantryShare
 import io.github.timmylich.wellness.lib.Backup
 import io.github.timmylich.wellness.lib.BackupError
 import io.github.timmylich.wellness.lib.FoodCache
@@ -321,6 +322,7 @@ private fun NotificationsPage() {
     }
     if (n.enabled) {
       Toggle(dict["settings.notifExpiry"], n.expiry) { v -> set { it.copy(expiry = v) } }
+      if (PantryShare.available) Toggle(dict["settings.notifShopping"], n.shopping, dict["settings.notifShoppingHint"]) { v -> set { it.copy(shopping = v) } }
       if (Updates.builtIn) Toggle(dict["settings.notifUpdates"], n.updates, dict["settings.notifUpdatesHint"]) { v -> set { it.copy(updates = v) } }
     }
     if (Updates.builtIn) Button(if (checking) "…" else dict["settings.checkUpdates"], Modifier.fillMaxWidth(), kind = "secondary", icon = "download", enabled = !checking) {

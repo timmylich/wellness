@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import io.github.timmylich.wellness.ui.LocalMotion
 import io.github.timmylich.wellness.ui.Nav
+import io.github.timmylich.wellness.ui.Reveal
 import io.github.timmylich.wellness.ui.Route
 import io.github.timmylich.wellness.ui.SheetTitle
 import io.github.timmylich.wellness.ui.StepsForm
@@ -143,10 +144,15 @@ fun Overview() {
     }
     val items = ADD_ITEMS.filter { settings.section(it.third) }
     if (items.isNotEmpty()) FabMenu(items) { kind ->
-      if (kind == "food") Nav.push(Route.FoodSearch()) else adding = kind
+      if (kind == "food") Nav.push(Route.FoodSearch(FoodDay.date)) else adding = kind
     }
   }
   adding?.let { kind -> QuickAdd(kind) { adding = null } }
+  // Saved from the "+" menu: open the section that shows the new entry.
+  LaunchedEffect(Reveal.target) {
+    val t = Reveal.target ?: return@LaunchedEffect
+    if (t == "bodyLog") select("body") else if (tabs.any { it.first == t }) select(t)
+  }
 }
 
 /**

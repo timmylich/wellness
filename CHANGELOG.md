@@ -6,6 +6,46 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-11-16
+
+**Added**
+- Pantry "Ideas" page: 71 simple dishes (`assets/recipes.json`) matched against what is at
+  home; complete dishes first, ordered by the products closest to expiry, then dishes missing
+  one product (one tap puts it on the shopping list).
+- Pantry search, and an offer to merge products with the same name (earliest expiry, amounts
+  added up).
+- Tapping a date in any date field opens a calendar.
+- Heart and body entries show a "saved" note and scroll to (and outline) the chart.
+- Adding food from an earlier day says so and lets you change the day right there; the "+"
+  menu adds food to the day shown in the nutrition section.
+- Pantry "Export" page: ready prompts (recipes, 3-day menu, quick, healthy) with the product
+  list, to copy or share into an AI chat; links to Le Chat (Mistral), Claude, ChatGPT and Gemini.
+  The app itself sends nothing. The prompt can be edited in a scrolling box; expiry dates are left out
+  unless switched on.
+- The update notification has two buttons: open the release on GitHub or download the APK.
+- Shared pantry: items another phone adds to the shopping list show a note while the app is
+  open and a notification otherwise (a read-only check about every 30 minutes; can be turned
+  off in the notification settings).
+
+**Changed**
+- Product types in the pantry form are replaced by 8 shelf-life choices with examples; the
+  type is still guessed from the name for the opened-package and package-size defaults.
+- Pantry products are compact tiles with a freshness stripe, placed straight on the page.
+- The pantry tab chips scroll to the selected page when the pages are swiped.
+- Pantry pages stay composed and switch like the overview sections, so swiping between them
+  no longer stutters; dish matching splits names once instead of per ingredient.
+- Slider tracks are visible on any background.
+- Swiping past the edge of the overview or pantry pages drags the neighbouring tab along with
+  the finger instead of jumping after release.
+- Text selection handles use the app colour; the copy / paste toolbar follows the app's dark
+  theme.
+- The pantry amount slider moves only on a sideways drag that starts on its thumb, so
+  scrolling the list no longer changes amounts.
+
+**Fixed**
+- Screens left open over midnight kept showing yesterday as "today".
+- An empty strip above the keyboard on tab pages (the bottom bar now hides while typing).
+
 ## [0.7.0] — 2026-11-13
 
 The pantry grows into a small household tool: a shared list for the family, a shopping list,

@@ -124,6 +124,15 @@ object Actions {
 
   fun removePantryItem(id: String) = set { s -> s.copy(pantry = s.pantry.filterNot { it.id == id }) }
 
+  /** Several products with the same name become one (see [mergeItems]); returns the kept id. */
+  fun mergePantryItems(ids: Set<String>): String? {
+    val group = Store.data.pantry.filter { it.id in ids }
+    if (group.size < 2) return null
+    val m = io.github.timmylich.wellness.lib.mergeItems(group)
+    set { s -> s.copy(pantry = s.pantry.filterNot { it.id in ids && it.id != m.id }.map { if (it.id == m.id) m else it }) }
+    return m.id
+  }
+
   /** Whole lists at once (shared pantry sync). */
   fun setShared(pantry: List<PantryItem>, shopping: List<ShoppingItem>, log: List<PantryOutcome>) =
     set { it.copy(pantry = pantry, shopping = shopping, pantryLog = log.sortedBy { o -> o.at }.takeLast(1000)) }

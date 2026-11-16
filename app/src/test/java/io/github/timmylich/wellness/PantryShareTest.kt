@@ -117,4 +117,9 @@ class PantryShareTest {
     val m = PantryShare.merge(b, l, Shared(listOf(item("a"), item("b")), l = listOf(PantryOutcome("o2", "2026-01-02", "x", "eaten"))))
     assertEquals(setOf("o1", "o2"), m.l.map { it.id }.toSet())
   }
+
+  @Test fun incomingIsOnlyNewUnboughtOthers() {
+    val list = listOf(ShoppingItem("mine", "Хлеб"), ShoppingItem("new", "Молоко"), ShoppingItem("bought", "Сыр", boughtAt = 1), ShoppingItem("told", "Яйца"))
+    assertEquals(listOf("new"), PantryShare.incoming(setOf("mine"), list, setOf("told")).map { it.id })
+  }
 }

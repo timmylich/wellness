@@ -10,8 +10,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -41,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,7 +70,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import io.github.timmylich.wellness.lib.addDays
 import io.github.timmylich.wellness.lib.humanDate
-import io.github.timmylich.wellness.lib.todayKey
+import io.github.timmylich.wellness.lib.Today
+import io.github.timmylich.wellness.lib.parseKey
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -229,6 +234,9 @@ fun Slider(
   zones: List<Zone> = emptyList(),
   marks: List<Double> = emptyList(),
   haptics: Boolean = true,
+  /** In scrolling lists: only a sideways drag that starts on the thumb moves it; taps and scrolls pass through. */
+  grabThumb: Boolean = false,
+  thumb: Dp = 28.dp,
 ) {
   val pal = c
   val haptic = LocalHapticFeedback.current
@@ -236,7 +244,6 @@ fun Slider(
   val cur by rememberUpdatedState(value)
   val change by rememberUpdatedState(onChange)
   val complete by rememberUpdatedState(onComplete)
-  val thumb = 28.dp
   BoxWithConstraints(Modifier.fillMaxWidth().height(thumb + 12.dp)) {
     val d = LocalDensity.current
     val w = constraints.maxWidth.toFloat()
@@ -247,7 +254,7 @@ fun Slider(
       Modifier.fillMaxWidth().height(thumb + 12.dp).pointerInput(min, max, step, track) {
         // The slider keeps the whole gesture (pagers and scroll views do not take it over).
         awaitEachGesture {
-          val down = awaitFirstDown()
+          val down = awaitFirstDown(requireUnconsumed = false)
           var last = cur
           fun apply(x: Float) {
             val raw = min + (x.coerceIn(0f, track) / track) * (max - min)
@@ -258,9 +265,20 @@ fun Slider(
               change(r)
             }
           }
-          dragging = true
-          var x = down.position.x - tPx / 2
-          down.consume()
+          var x: Float
+          if (grabThumb) {
+            if (down.isConsumed || kotlin.math.abs(down.position.x - tPx / 2 - toX(cur)) > tPx) return@awaitEachGesture
+            // Clearly sideways before the list's own scroll claims the gesture, or nothing.
+            awaitTouchSlopOrCancellation(down.id) { ch, over ->
+              if (kotlin.math.abs(over.x) > kotlin.math.abs(over.y) * 2) ch.consume()
+            } ?: return@awaitEachGesture
+            dragging = true
+            x = toX(cur)
+          } else {
+            dragging = true
+            x = down.position.x - tPx / 2
+            down.consume()
+          }
           apply(x)
           while (true) {
             val ch = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
@@ -278,7 +296,8 @@ fun Slider(
         val cy = size.height / 2
         val left = tPx / 2
         val h = 8.dp.toPx()
-        drawRoundRect(pal.cardAlt, androidx.compose.ui.geometry.Offset(left, cy - h / 2), androidx.compose.ui.geometry.Size(track, h), androidx.compose.ui.geometry.CornerRadius(h / 2))
+        // Visible on cards and on tiles alike (cardAlt matched some backgrounds).
+        drawRoundRect(pal.textDim.a(0.28f), androidx.compose.ui.geometry.Offset(left, cy - h / 2), androidx.compose.ui.geometry.Size(track, h), androidx.compose.ui.geometry.CornerRadius(h / 2))
         for (z in zones) drawRect(z.color, androidx.compose.ui.geometry.Offset(left + toX(z.from), cy - h / 2), androidx.compose.ui.geometry.Size(toX(z.to) - toX(z.from), h))
         for (m in marks) drawRoundRect(pal.textDim, androidx.compose.ui.geometry.Offset(left + toX(m) - 1.dp.toPx(), cy - 9.dp.toPx()), androidx.compose.ui.geometry.Size(2.dp.toPx(), 18.dp.toPx()), androidx.compose.ui.geometry.CornerRadius(1.dp.toPx()))
         val x = left + toX(value)
@@ -296,7 +315,7 @@ fun Slider(
 /** "‹ Today ›" day switcher used by per-day sections; the label slides in the travel direction. */
 @Composable
 fun DateNav(date: String, onChange: (String) -> Unit) {
-  val isToday = date >= todayKey()
+  val isToday = date >= Today.key
   val dict = L
   val on = LocalMotion.current
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -313,21 +332,34 @@ fun DateNav(date: String, onChange: (String) -> Unit) {
       label = "date",
     ) { d ->
       Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        T(humanDate(d, dict), Modifier.tap(scaleTo = 1f) { onChange(todayKey()) }, size = 16, bold = true)
+        T(humanDate(d, dict), Modifier.tap(scaleTo = 1f) { onChange(Today.key) }, size = 16, bold = true)
       }
     }
     Box(Modifier.tap(enabled = !isToday) { onChange(addDays(date, 1)) }.padding(6.dp)) { Icon("right", color = c.accent, glow = !isToday) }
   }
 }
 
-/** Day picker with − / + steps around a readable date. */
+/** Opens the platform calendar on [value]; picks go to [onPick] as day keys. */
+fun pickDate(ctx: android.content.Context, value: String, dark: Boolean, onPick: (String) -> Unit) {
+  val d = parseKey(value)
+  val theme = if (dark) android.R.style.Theme_DeviceDefault_Dialog_Alert else android.R.style.Theme_DeviceDefault_Light_Dialog_Alert
+  android.app.DatePickerDialog(ctx, theme, { _, y, m, day -> onPick(java.time.LocalDate.of(y, m + 1, day).toString()) }, d.year, d.monthValue - 1, d.dayOfMonth).show()
+}
+
+/** Day picker with − / + steps around a readable date; tap the date for a calendar. */
 @Composable
 fun DateStep(label: String, value: String, onChange: (String) -> Unit) {
+  val ctx = androidx.compose.ui.platform.LocalContext.current
+  val dark = c.dark
   Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     T(label, dim = true, size = 13)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       Box(Modifier.tap { onChange(addDays(value, -1)) }.background(c.accentSoft, RoundedCornerShape(12.dp)).padding(10.dp)) { Icon("minus", 18.dp, c.accent) }
-      T(humanDate(value, L), Modifier.weight(1f), bold = true, center = true)
+      T(
+        humanDate(value, L),
+        Modifier.weight(1f).tap(scaleTo = 0.97f) { pickDate(ctx, value, dark, onChange) }.background(c.cardAlt, RoundedCornerShape(12.dp)).padding(vertical = 10.dp),
+        bold = true, center = true,
+      )
       Box(Modifier.tap { onChange(addDays(value, 1)) }.background(c.accentSoft, RoundedCornerShape(12.dp)).padding(10.dp)) { Icon("plus", 18.dp, c.accent) }
     }
   }
@@ -341,6 +373,78 @@ fun Grid2(items: Int, gap: Dp = 8.dp, cell: @Composable (Int, Modifier) -> Unit)
       Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(gap)) {
         cell(row * 2, Modifier.weight(1f).fillMaxWidth())
         if (row * 2 + 1 < items) cell(row * 2 + 1, Modifier.weight(1f).fillMaxWidth()) else Box(Modifier.weight(1f))
+      }
+    }
+  }
+}
+
+// ---- toast -----------------------------------------------------------------------------
+
+/** A short "saved" note at the top of the screen. */
+object Toast {
+  var text by mutableStateOf<String?>(null)
+    private set
+  var shownAt by mutableLongStateOf(0L)
+    private set
+
+  fun show(t: String) {
+    text = t
+    shownAt = System.currentTimeMillis()
+  }
+}
+
+/** Section part to scroll to after a save ("heart", "body", "bodyLog"); the section clears it. */
+object Reveal {
+  var target by mutableStateOf<String?>(null)
+}
+
+/**
+ * Card modifier for a [Reveal] target: scrolls the card into view and outlines it for a moment.
+ */
+@Composable
+fun Modifier.revealOn(id: String): Modifier {
+  val req = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+  var lit by remember { mutableStateOf(false) }
+  val color by androidx.compose.animation.animateColorAsState(if (lit) c.accent else androidx.compose.ui.graphics.Color.Transparent, label = "reveal")
+  androidx.compose.runtime.LaunchedEffect(Reveal.target) {
+    if (Reveal.target != id) return@LaunchedEffect
+    // Let the sheet close and the section page settle first.
+    kotlinx.coroutines.delay(350)
+    req.bringIntoView()
+    lit = true
+    Reveal.target = null
+  }
+  androidx.compose.runtime.LaunchedEffect(lit) {
+    if (!lit) return@LaunchedEffect
+    kotlinx.coroutines.delay(1400)
+    lit = false
+  }
+  return this.bringIntoViewRequester(req).border(2.dp, color, RoundedCornerShape(18.dp))
+}
+
+@Composable
+fun ToastHost() {
+  val visible = remember { androidx.compose.animation.core.MutableTransitionState(false) }
+  androidx.compose.runtime.LaunchedEffect(Toast.shownAt) {
+    if (Toast.text == null) return@LaunchedEffect
+    visible.targetState = true
+    kotlinx.coroutines.delay(2600)
+    visible.targetState = false
+  }
+  Box(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 64.dp), contentAlignment = Alignment.TopCenter) {
+    androidx.compose.animation.AnimatedVisibility(
+      visible,
+      enter = fadeIn() + androidx.compose.animation.slideInVertically { -it },
+      exit = fadeOut() + androidx.compose.animation.slideOutVertically { -it },
+    ) {
+      Row(
+        Modifier.padding(horizontal = 24.dp).background(c.card, RoundedCornerShape(24.dp)).border(1.dp, c.ok.a(0.5f), RoundedCornerShape(24.dp))
+          .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        Box(Modifier.size(22.dp).background(c.ok, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) { Icon("check", 14.dp, androidx.compose.ui.graphics.Color.White) }
+        T(Toast.text.orEmpty(), size = 14, bold = true)
       }
     }
   }

@@ -16,8 +16,8 @@ android {
     minSdk = 26
     targetSdk = 36
     // Continues the React Native app's numbering, so it installs as an update.
-    versionCode = 11
-    versionName = "0.7.0"
+    versionCode = 12
+    versionName = "0.8.0"
     // F-Droid builds pass -PupdateCheck=false (F-Droid updates the app itself).
     buildConfigField("boolean", "UPDATE_CHECK", (project.findProperty("updateCheck") ?: "true").toString())
     // Shared pantry backend (supabase/pantry-share.sql). The publishable key is public by design;

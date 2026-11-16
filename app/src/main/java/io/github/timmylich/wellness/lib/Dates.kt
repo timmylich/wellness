@@ -1,6 +1,9 @@
 /** Local-time date helpers. All day keys are "YYYY-MM-DD" in the device timezone. */
 package io.github.timmylich.wellness.lib
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import io.github.timmylich.wellness.i18n.Dict
 import java.time.Instant
 import java.time.LocalDate
@@ -10,6 +13,22 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 
 fun todayKey(): String = LocalDate.now().toString()
+
+/**
+ * Today's key as Compose state: refreshed on resume and at midnight (MainActivity), so screens
+ * left open overnight move on to the new day.
+ */
+object Today {
+  var key by mutableStateOf(todayKey())
+    private set
+
+  fun refresh() {
+    key = todayKey()
+  }
+}
+
+/** Milliseconds until the next local midnight. */
+fun msToMidnight(): Long = java.time.Duration.between(LocalDateTime.now(), LocalDate.now().plusDays(1).atStartOfDay()).toMillis()
 
 fun parseKey(key: String): LocalDate = LocalDate.parse(key)
 

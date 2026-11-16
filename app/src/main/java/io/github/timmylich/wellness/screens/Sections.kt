@@ -80,6 +80,7 @@ import io.github.timmylich.wellness.lib.stepsKcal
 import io.github.timmylich.wellness.lib.sumEntries
 import io.github.timmylich.wellness.lib.targetsFor
 import io.github.timmylich.wellness.lib.timeLabel
+import io.github.timmylich.wellness.lib.Today
 import io.github.timmylich.wellness.lib.todayKey
 import io.github.timmylich.wellness.lib.wakingDayProgress
 import io.github.timmylich.wellness.lib.waterRange
@@ -97,6 +98,7 @@ import io.github.timmylich.wellness.ui.Button
 import io.github.timmylich.wellness.ui.Card
 import io.github.timmylich.wellness.ui.Chip
 import io.github.timmylich.wellness.ui.DateNav
+import io.github.timmylich.wellness.ui.revealOn
 import io.github.timmylich.wellness.ui.Empty
 import io.github.timmylich.wellness.ui.H
 import io.github.timmylich.wellness.ui.HRow
@@ -175,7 +177,7 @@ fun Summary(onOpen: (String) -> Unit) {
   val d = Store.data
   val dict = L
   val haptic = LocalHapticFeedback.current
-  val today = todayKey()
+  val today = Today.key
   val s = d.settings
   val steps = d.steps[today] ?: 0.0
   val lastHeart = d.heart.lastOrNull { it.systolic != null }
@@ -287,6 +289,16 @@ fun Summary(onOpen: (String) -> Unit) {
 
 // ---- nutrition -------------------------------------------------------------------------
 
+/** The day shown in the nutrition section (null: today); the "+" menu adds food to it too. */
+object FoodDay {
+  private var picked by mutableStateOf<String?>(null)
+  val date get() = picked ?: Today.key
+
+  fun pick(d: String) {
+    picked = d.takeIf { it != Today.key }
+  }
+}
+
 @Composable
 private fun NutrientRow(k: Nutrient, value: Double, range: Range, onOpen: (Nutrient) -> Unit) {
   val dict = L
@@ -307,7 +319,7 @@ private fun NutrientRow(k: Nutrient, value: Double, range: Range, onOpen: (Nutri
 fun Nutrition() {
   val d = Store.data
   val dict = L
-  var date by rememberSaveable { mutableStateOf(todayKey()) }
+  val date = FoodDay.date
   var editing by remember { mutableStateOf<FoodEntry?>(null) }
   var detail by remember { mutableStateOf<Nutrient?>(null) }
   var period by rememberSaveable { mutableStateOf(7) }
@@ -315,7 +327,7 @@ fun Nutrition() {
   val day = daySummary(d, date)
   val totals = day.totals
   val targets = day.targets
-  val advice = nutritionAdvice(totals, targets, if (date == todayKey()) wakingDayProgress() else 1.0)
+  val advice = nutritionAdvice(totals, targets, if (date == Today.key) wakingDayProgress() else 1.0)
   val correction = remember(date, d.foodLog, d.settings) { adaptiveCorrection(d, date) }
   val trend = remember(period, date, d.foodLog, d.workouts, d.steps, d.profile, d.settings, chartKey) {
     // Trend charts always end today: they show history, not the selected day.
@@ -397,7 +409,7 @@ fun Nutrition() {
     },
   )
 
-  DateNav(date) { date = it }
+  DateNav(date) { FoodDay.pick(it) }
   StatCarousel(pages)
   Button(dict["nutrition.addFood"], Modifier.fillMaxWidth(), icon = "plus", big = true) { Nav.push(Route.FoodSearch(date)) }
   Card {
@@ -474,7 +486,9 @@ private fun StatCarousel(pages: List<Pair<String, @Composable () -> Unit>>) {
 fun Water() {
   val d = Store.data
   val dict = L
-  var date by rememberSaveable { mutableStateOf(todayKey()) }
+  // null: today, so an open screen moves on at midnight.
+  var picked by rememberSaveable { mutableStateOf<String?>(null) }
+  val date = picked ?: Today.key
   var period by rememberSaveable { mutableStateOf(7) }
   var editing by remember { mutableStateOf<WaterEntry?>(null) }
   val w = waterDay(d, date)
@@ -503,7 +517,7 @@ fun Water() {
   val withData = chart.filter { it.second > 0 }
   val avg = if (withData.isEmpty()) 0.0 else withData.sumOf { it.second } / withData.size
 
-  DateNav(date) { date = it }
+  DateNav(date) { picked = it.takeIf { d -> d != Today.key } }
   Card {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
       Ring(w.total, range.target, 180.dp, 16.dp, color) {
@@ -570,7 +584,8 @@ fun Activity() {
   val dict = L
   val ctx = LocalContext.current
   val scope = rememberCoroutineScope()
-  var date by rememberSaveable { mutableStateOf(todayKey()) }
+  var picked by rememberSaveable { mutableStateOf<String?>(null) }
+  val date = picked ?: Today.key
   var period by rememberSaveable { mutableStateOf(7) }
   var sheet by remember { mutableStateOf<ActivitySheet?>(null) }
   var editing by remember { mutableStateOf<WorkoutEntry?>(null) }
@@ -580,7 +595,7 @@ fun Activity() {
   val workouts = d.workouts.filter { it.date == date }
   val chart = remember(period, date, d.steps) { lastDays(period, date).map { shortLabel(it) to (d.steps[it] ?: 0.0) } }
 
-  DateNav(date) { date = it }
+  DateNav(date) { picked = it.takeIf { d -> d != Today.key } }
   Card {
     H(dict["activity.steps"], "activity", right = { T(dict["common.edit"], Modifier.tap { sheet = ActivitySheet.Steps }, color = c.accent) })
     T(fmt(steps), size = 40, bold = true)
@@ -662,7 +677,7 @@ fun Heart() {
     H(dict["heart.newMeasurement"], "heart")
     HeartForm()
   }
-  Card {
+  Card(Modifier.revealOn("heart")) {
     H(dict["heart.stats"], right = { Segmented(count, listOf(14 to "14", 30 to "30", 90 to "90", 365 to "365")) { count = it } })
     Stats {
       Stat(dict["heart.avgBp"], if (bp.isNotEmpty()) "${fmt(avgSys)}/${fmt(avgDia)}" else "—", Modifier.weight(1f))
@@ -774,7 +789,7 @@ fun Body() {
     H(dict["body.measure"], "ruler")
     BodyForm()
   }
-  Card {
+  Card(Modifier.revealOn("body")) {
     H(dict["body.trend"], right = { PeriodPicker(period) { period = it } })
     if (weights.isEmpty()) Empty(dict[if (sorted.any { it.weightKg != null }) "common.noRecords" else "body.first"])
     else {
@@ -787,7 +802,7 @@ fun Body() {
       if (weights.size > 1) T(dict.change(smooth.last() - smooth.first(), humanDate(weights[0].date, dict)))
     }
   }
-  Card {
+  Card(Modifier.revealOn("bodyLog")) {
     H(dict["body.log"])
     if (sorted.isEmpty()) Empty(dict["common.noRecords"])
     for (e in sorted.asReversed().take(50)) {

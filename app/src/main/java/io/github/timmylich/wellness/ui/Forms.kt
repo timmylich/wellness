@@ -194,6 +194,8 @@ fun HeartForm(onDone: (() -> Unit)? = null) {
     Button(L["common.save"], Modifier.fillMaxWidth()) {
       Actions.addHeart(sys.toDouble(), dia.toDouble(), pulse.toDouble(), note.trim().ifEmpty { null })
       note = ""
+      Toast.show(currentDict.t("heart.saved", "$sys/$dia", pulse))
+      Reveal.target = "heart"
       onDone?.invoke()
     }
     Hint(L["heart.howTitle"], L["heart.how"])
@@ -288,6 +290,8 @@ fun BodyForm(onDone: (() -> Unit)? = null) {
       val e = BodyEntry("", "", 0, draft, parseNum(fat), w, n, parseNum(hip), parseNum(height))
       if (listOf(e.weightKg, e.bodyFatPct, e.waistCm, e.neckCm, e.hipCm, e.heightCm).all { it == null }) return@Button
       Actions.addBody(e)
+      Toast.show(draft?.let { currentDict.t("body.saved", it) } ?: currentDict["body.savedOther"])
+      Reveal.target = if (draft != null) "body" else "bodyLog"
       fat = ""; waist = ""; neck = ""; hip = ""; height = ""
       onDone?.invoke()
     }

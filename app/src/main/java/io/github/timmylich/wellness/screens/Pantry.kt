@@ -1,6 +1,6 @@
 /**
- * Pantry tab, three swipeable pages: products at home (expiry, opened packages, counts, eaten /
- * thrown away), the shopping list, and statistics with history and family members. Pantry and
+ * Pantry tab, five swipeable pages: products at home (expiry, opened packages, counts, eaten /
+ * thrown away), dish ideas from them, AI-chat prompts, the shopping list, and statistics with history and family members. Pantry and
  * shopping list can be shared by a family code (lib/PantryShare.kt).
  */
 package io.github.timmylich.wellness.screens
@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,6 +38,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,7 +57,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import io.github.timmylich.wellness.ui.scrollbar
 import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -89,6 +96,10 @@ import io.github.timmylich.wellness.lib.humanDate
 import io.github.timmylich.wellness.lib.keyOf
 import io.github.timmylich.wellness.lib.searchLocal
 import io.github.timmylich.wellness.lib.timeLabel
+import io.github.timmylich.wellness.lib.Today
+import io.github.timmylich.wellness.lib.dishIdeas
+import io.github.timmylich.wellness.lib.duplicateGroups
+import io.github.timmylich.wellness.lib.normName
 import io.github.timmylich.wellness.lib.todayKey
 import io.github.timmylich.wellness.ui.AppSheet
 import io.github.timmylich.wellness.ui.Bar
@@ -100,6 +111,7 @@ import io.github.timmylich.wellness.ui.DialogButton
 import io.github.timmylich.wellness.ui.Divider
 import io.github.timmylich.wellness.ui.Empty
 import io.github.timmylich.wellness.ui.Field
+import io.github.timmylich.wellness.ui.Grid2
 import io.github.timmylich.wellness.ui.H
 import io.github.timmylich.wellness.ui.HRow
 import io.github.timmylich.wellness.ui.Icon
@@ -119,6 +131,9 @@ import io.github.timmylich.wellness.ui.fmt
 import io.github.timmylich.wellness.ui.numStr
 import io.github.timmylich.wellness.ui.parseNum
 import io.github.timmylich.wellness.ui.rememberEdgeSwipe
+import io.github.timmylich.wellness.ui.rememberPagerJump
+import io.github.timmylich.wellness.ui.Toast
+import io.github.timmylich.wellness.lib.openUrl
 import io.github.timmylich.wellness.ui.showDialog
 import io.github.timmylich.wellness.ui.tap
 import kotlinx.coroutines.delay
@@ -137,7 +152,10 @@ private const val POLL_MS = 30_000L
 /** Units counted in whole pieces: they get −/+ buttons instead of a slider. */
 private val COUNTED = setOf("pcs", "pack")
 
-private val PAGES = listOf("home", "shopping", "stats")
+private val PAGES = listOf("home", "ideas", "shopping", "export", "stats")
+
+/** Shelf-life choices in the product form, in days (labels and examples: pantry.terms.d<days>). */
+val SHELF_TERMS = listOf(2, 4, 7, 14, 30, 90, 180, 365)
 
 fun daysLeft(p: PantryItem, today: String = todayKey()): Long = daysBetween(today, p.expiresAt)
 
@@ -191,8 +209,9 @@ fun Pantry() {
   val dict = L
   val ctx = LocalContext.current
   val d = Store.data
-  val scope = rememberCoroutineScope()
   val pager = rememberPagerState { PAGES.size }
+  // All pages stay composed after the first frame, so a swipe never builds a page midway.
+  val jump = rememberPagerJump(pager)
   var sharing by remember { mutableStateOf(false) }
   // Swiping past the first or last page moves to the neighbouring bottom tab.
   val edge = rememberEdgeSwipe(LocalTabs.current)
@@ -200,18 +219,25 @@ fun Pantry() {
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
       T(dict["tabs.pantry"], size = 28, bold = true)
       val waiting = d.shopping.count { it.boughtAt == null }
-      Segmented(
-        pager.targetPage,
-        listOf(
-          0 to "${dict["pantry.tabHome"]} · ${d.pantry.count { it.left > 0 }}",
-          1 to dict["pantry.tabShopping"] + if (waiting > 0) " · $waiting" else "",
-          2 to dict["pantry.tabStats"],
-        ),
-      ) { scope.launch { pager.animateScrollToPage(it) } }
+      val labels = listOf(
+        "${dict["pantry.tabHome"]} · ${d.pantry.count { it.left > 0 }}",
+        dict["pantry.tabIdeas"],
+        dict["pantry.tabShopping"] + if (waiting > 0) " · $waiting" else "",
+        dict["pantry.tabExport"],
+        dict["pantry.tabStats"],
+      )
+      // The selected tab chip scrolls into view when the pages are swiped.
+      val chips = remember { List(PAGES.size) { androidx.compose.foundation.relocation.BringIntoViewRequester() } }
+      LaunchedEffect(jump.target) { chips[jump.target].bringIntoView() }
+      Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        labels.forEachIndexed { i, l ->
+          Box(Modifier.bringIntoViewRequester(chips[i])) { Chip(l, active = jump.target == i) { jump.go(i) } }
+        }
+      }
     }
-    HorizontalPager(pager, Modifier.weight(1f).nestedScroll(edge), key = { PAGES[it] }) { i ->
+    HorizontalPager(pager, Modifier.weight(1f).nestedScroll(edge), beyondViewportPageCount = jump.beyond, key = { PAGES[it] }) { i ->
       Column(
-        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+        jump.page(i).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         if (PantryShare.expired) Card {
@@ -219,6 +245,8 @@ fun Pantry() {
           Button(dict["pantry.share.ok"], Modifier.fillMaxWidth(), kind = "secondary") { PantryShare.dismissExpired() }
         }
         when (PAGES[i]) {
+          "ideas" -> PantryIdeas()
+          "export" -> PantryExport()
           "shopping" -> ShoppingList()
           "stats" -> PantryStatsPage()
           else -> PantryHome()
@@ -278,6 +306,10 @@ private fun PantryHome() {
   val ctx = LocalContext.current
   val d = Store.data
   val items = d.pantry
+  val today = Today.key
+  var query by remember { mutableStateOf("") }
+  // shortcut: dismissed duplicate offers are forgotten on restart; persist them if that annoys.
+  val dismissed = remember { mutableStateMapOf<String, Boolean>() }
   var editing by remember { mutableStateOf<PantryItem?>(null) }
   var adding by remember { mutableStateOf(false) }
   // A bought shopping-list item being added through the form.
@@ -287,8 +319,11 @@ private fun PantryHome() {
   val ghosts = remember { mutableStateMapOf<String, Ghost>() }
   val sorted = items.filter { it.left > 0 || it.id in zeroed }.sortedBy { it.expiresAt }
   val shownGhosts = ghosts.values.filter { g -> sorted.none { it.id == g.item.id } }
+  val q = normName(query)
   val rows = (sorted.map { it to null } + shownGhosts.map { it.item to it }).sortedBy { it.first.expiresAt }
-  val states = sorted.groupingBy { freshness(it).second }.eachCount()
+    .filter { q.isEmpty() || normName(it.first.name).contains(q) }
+  val states = sorted.groupingBy { freshness(it, today).second }.eachCount()
+  val dups = duplicateGroups(items).filter { g -> dismissed[normName(g[0].name)] != true }
   val bought = d.shopping.filter { it.boughtAt != null }.sortedByDescending { it.boughtAt }
   val finish = { p: PantryItem, kind: String ->
     val z = zeroed.remove(p.id)
@@ -321,17 +356,35 @@ private fun PantryHome() {
     }
   }
 
-  Card(Modifier.animateContentSize()) {
+  Column(Modifier.animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     H(dict["pantry.title"], "pantry", right = { T("+ ${dict["pantry.add"]}", Modifier.tap { adding = true }, color = c.accent) })
     if ((states["expired"] ?: 0) + (states["soon"] ?: 0) > 0) Wrap(6.dp) {
       states["expired"]?.let { Badge("${dict["pantry.expired"]}: $it", c.danger) }
       states["soon"]?.let { Badge("${dict["pantry.soon"]}: $it", c.high) }
     }
-    if (rows.isEmpty()) Empty(dict["pantry.empty"])
+    if (sorted.size >= 4 || query.isNotEmpty()) Field(query, { query = it }, Modifier.fillMaxWidth(), numeric = false, placeholder = dict["pantry.searchPh"], search = true)
+    for (g in dups) key("dup-" + g[0].id) {
+      Row(
+        Modifier.fillMaxWidth().background(c.accentSoft, RoundedCornerShape(12.dp)).padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
+        T(dict.t("pantry.dupAsk", g[0].name.trim(), g.size), Modifier.weight(1f), size = 13)
+        Chip(dict["pantry.merge"]) {
+          val ids = g.map { it.id }.toSet()
+          Actions.mergePantryItems(ids)?.let { kept ->
+            for (id in ids - kept) Reminders.cancel(ctx, "pantry-$id")
+            Store.data.pantry.firstOrNull { it.id == kept }?.let { scheduleReminder(ctx, it, dict["pantry.notifTitle"], dict.t("pantry.notifBody", it.name)) }
+          }
+        }
+        Box(Modifier.size(32.dp).tap { dismissed[normName(g[0].name)] = true }, contentAlignment = Alignment.Center) { Icon("close", 14.dp, c.textDim) }
+      }
+    }
+    if (rows.isEmpty()) Empty(dict[if (q.isEmpty()) "pantry.empty" else "food.nothing"])
     for ((p, ghost) in rows) key(p.id) {
       if (ghost != null) GhostRow(ghost) { ghosts.remove(p.id) }
       else PantryRow(
-        p, zeroed[p.id]?.deadline, { editing = p },
+        p, today, zeroed[p.id]?.deadline, { editing = p },
         onZero = { before -> zeroed[p.id] = Zeroed(System.currentTimeMillis() + REMOVE_DELAY_MS, before) },
         onRevive = { zeroed.remove(p.id) },
         onFinish = { kind -> finish(p, kind) },
@@ -367,7 +420,7 @@ private fun GhostRow(g: Ghost, onGone: () -> Unit) {
   }
   AnimatedVisibility(visible, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
     Row(
-      Modifier.fillMaxWidth().padding(vertical = 6.dp).background(c.cardAlt, RoundedCornerShape(14.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+      Modifier.fillMaxWidth().background(c.card, RoundedCornerShape(12.dp)).border(0.5.dp, c.border, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -394,15 +447,15 @@ private fun Badge(text: String, color: Color) =
 
 @Composable
 private fun RoundIcon(icon: String, enabled: Boolean = true, onClick: () -> Unit) =
-  Box(Modifier.size(36.dp).tap(enabled, onClick = onClick).background(c.accentSoft, CircleShape), contentAlignment = Alignment.Center) {
-    Icon(icon, 18.dp, if (enabled) c.accent else c.textDim)
+  Box(Modifier.size(32.dp).tap(enabled, onClick = onClick).background(c.accentSoft, CircleShape), contentAlignment = Alignment.Center) {
+    Icon(icon, 16.dp, if (enabled) c.accent else c.textDim)
   }
 
 @Composable
-private fun PantryRow(item: PantryItem, removeAt: Long?, onEdit: () -> Unit, onZero: (Double) -> Unit, onRevive: () -> Unit, onFinish: (String) -> Unit) {
+private fun PantryRow(item: PantryItem, today: String, removeAt: Long?, onEdit: () -> Unit, onZero: (Double) -> Unit, onRevive: () -> Unit, onFinish: (String) -> Unit) {
   val dict = L
   val ctx = LocalContext.current
-  val (used, state) = freshness(item)
+  val (used, state) = freshness(item, today)
   val color = when (state) {
     "expired" -> c.danger
     "soon" -> c.high
@@ -431,52 +484,108 @@ private fun PantryRow(item: PantryItem, removeAt: Long?, onEdit: () -> Unit, onZ
   val count = item.amountG?.takeIf { unit in COUNTED && it >= 1 }
   val leaving = removeAt != null && removeAt - now < 280
   AnimatedVisibility(!leaving, exit = fadeOut() + slideOutHorizontally { it / 6 }) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-      Column(Modifier.tap(scaleTo = 1f, onClick = onEdit), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-          T(item.name, Modifier.weight(1f), bold = true)
-          T(dict.daysLeft(daysLeft(item)), size = 13, color = color)
+    // Each product is its own tile with a freshness stripe on the left: compact and clearly apart.
+    val card = c.card
+    Row(
+      Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)
+        .drawBehind {
+          // Freshness stripe as the tile's left edge: the colour shows past an inset card, so it
+          // follows the corner rounding and tapers off around it.
+          val r = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
+          val inset = 4.dp.toPx()
+          drawRoundRect(color, cornerRadius = r)
+          drawRoundRect(card, androidx.compose.ui.geometry.Offset(inset, 0f), androidx.compose.ui.geometry.Size(size.width - inset, size.height), r)
         }
-        // Freshness: how much of the shelf life has passed.
-        Bar(max(0.04, used).toFloat(), color, 6.dp)
-        val showState = state != "fresh"
-        if (showState || item.openedAt != null || tags.isNotEmpty()) Wrap(4.dp) {
-          if (showState) Badge(dict["pantry.$state"], color)
-          if (item.openedAt != null) Badge(dict["pantry.opened"], c.accent)
-          for (t in tags) Badge(dict["pantry.tags.$t"], c.textDim)
+        .border(0.5.dp, c.border, RoundedCornerShape(12.dp)),
+    ) {
+      Spacer(Modifier.width(4.dp))
+      Column(Modifier.weight(1f).padding(start = 10.dp, end = 10.dp, top = 7.dp, bottom = 3.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.tap(scaleTo = 1f, onClick = onEdit), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+          Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            T(item.name, Modifier.weight(1f), bold = true, size = 15, maxLines = 1)
+            if (item.openedAt != null) Badge(dict["pantry.opened"], c.accent)
+            T(dict.daysLeft(daysLeft(item, today)), size = 12, color = color, bold = state != "fresh")
+          }
+          // Freshness: how much of the shelf life has passed.
+          Bar(max(0.04, used).toFloat(), color.a(0.7f), 3.dp)
+          if (tags.isNotEmpty()) T(tags.joinToString(" · ") { dict["pantry.tags.$it"] }, dim = true, size = 11, maxLines = 1)
+        }
+        if (count != null) {
+          val have = (left * count).roundToInt()
+          Row(Modifier.padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            T("${dict["pantry.left"]}: $have / ${fmt(count)} ${dict["pantry.units.$unit"]}", Modifier.weight(1f), dim = true, size = 12)
+            RoundIcon("minus", have > 0) { commit(max(0, have - 1) / count) }
+            RoundIcon("plus", have < count) { commit(minOf(count, have + 1.0) / count) }
+          }
+        } else Row(verticalAlignment = Alignment.CenterVertically) {
+          val amount = item.amountG?.let { " · ${fmt(left * it)} ${dict["pantry.units.$unit"]}" } ?: ""
+          T("${(left * 100).roundToInt()}%$amount", Modifier.width(84.dp), dim = true, size = 12, maxLines = 1)
+          Box(Modifier.weight(1f)) {
+            Slider(left, 0.0, 1.0, 0.01, onChange = { draft = it }, haptics = false, grabThumb = true, thumb = 24.dp, onComplete = { v ->
+              draft = null
+              commit(v)
+            })
+          }
+        }
+        AnimatedVisibility(removeAt != null && item.left <= 0, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+          Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            T(dict.t("pantry.finishedAsk", max(0L, ceil(((removeAt ?: now) - now) / 1000.0).toLong())), size = 13)
+            HRow {
+              Button(dict["pantry.eaten"], Modifier.weight(1f), kind = "secondary", icon = "check") { onFinish("eaten") }
+              Button(dict["pantry.wasted"], Modifier.weight(1f), kind = "danger", icon = "trash") { onFinish("wasted") }
+            }
+            val listed = Store.data.shopping.any { it.boughtAt == null && it.name.equals(item.name, true) }
+            Chip(if (listed) "✓ ${dict["pantry.inShopping"]}" else "+ ${dict["pantry.toShopping"]}", active = listed) { Actions.addShopping(item.name) }
+          }
         }
       }
-      if (count != null) {
-        val have = (left * count).roundToInt()
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          T("${dict["pantry.left"]}: $have / ${fmt(count)} ${dict["pantry.units.$unit"]}", Modifier.weight(1f), dim = true, size = 13)
-          RoundIcon("minus", have > 0) { commit(max(0, have - 1) / count) }
-          RoundIcon("plus", have < count) { commit(minOf(count, have + 1.0) / count) }
-        }
-      } else Row(verticalAlignment = Alignment.CenterVertically) {
-        val amount = item.amountG?.let { " · ${fmt(left * it)} ${dict["pantry.units.$unit"]}" } ?: ""
-        T("${dict["pantry.left"]}: ${(left * 100).roundToInt()}%$amount", Modifier.width(92.dp), dim = true, size = 12)
-        Box(Modifier.weight(1f)) {
-          Slider(left, 0.0, 1.0, 0.01, onChange = { draft = it }, haptics = false, onComplete = { v ->
-            draft = null
-            commit(v)
-          })
-        }
-      }
-      AnimatedVisibility(removeAt != null && item.left <= 0, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-      Column(
-        Modifier.fillMaxWidth().background(c.cardAlt, RoundedCornerShape(12.dp)).padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        T(dict.t("pantry.finishedAsk", max(0L, ceil(((removeAt ?: now) - now) / 1000.0).toLong())), size = 13)
-        HRow {
-          Button(dict["pantry.eaten"], Modifier.weight(1f), kind = "secondary", icon = "check") { onFinish("eaten") }
-          Button(dict["pantry.wasted"], Modifier.weight(1f), kind = "danger", icon = "trash") { onFinish("wasted") }
-        }
-        val listed = Store.data.shopping.any { it.boughtAt == null && it.name.equals(item.name, true) }
-        Chip(if (listed) "✓ ${dict["pantry.inShopping"]}" else "+ ${dict["pantry.toShopping"]}", active = listed) { Actions.addShopping(item.name) }
-      }
-      }
+    }
+  }
+}
+
+// ---- dish ideas ------------------------------------------------------------------------
+
+/** Simple dishes from what is at home (assets/recipes.json); soon-to-expire products first. */
+@Composable
+private fun PantryIdeas() {
+  val dict = L
+  val d = Store.data
+  val today = Today.key
+  val ideas = remember(d.pantry, today) { dishIdeas(Assets.recipes, d.pantry, today) }
+  val ready = ideas.filter { it.missing.isEmpty() }
+  val almost = ideas.filter { it.missing.isNotEmpty() }.take(12)
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    H(dict["pantry.ideasTitle"], "salad")
+    T(dict["pantry.ideasHint"], dim = true, size = 12)
+    if (ready.isEmpty()) Empty(dict[if (d.pantry.none { it.left > 0 }) "pantry.ideasNoFood" else "pantry.ideasNone"])
+    for (i in ready) key(i.recipe.id) { IdeaRow(i, today) }
+  }
+  if (almost.isNotEmpty()) Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    H(dict["pantry.ideasAlmost"], "package")
+    for (i in almost) key(i.recipe.id) { IdeaRow(i, today) }
+  }
+}
+
+@Composable
+private fun IdeaRow(i: io.github.timmylich.wellness.lib.DishIdea, today: String) {
+  val dict = L
+  val ru = dict.lang == Lang.Ru
+  Column(
+    Modifier.fillMaxWidth().background(c.card, RoundedCornerShape(12.dp)).border(0.5.dp, c.border, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+    verticalArrangement = Arrangement.spacedBy(3.dp),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      T(if (ru) i.recipe.ru else i.recipe.en, Modifier.weight(1f), bold = true, size = 15)
+      T(dict.t("pantry.ideaMin", i.recipe.min), dim = true, size = 12)
+    }
+    // Products that should be eaten soon are marked, so the idea helps not to throw them away.
+    val soon = i.used.filter { freshness(it, today).second != "fresh" }
+    T(dict.t("pantry.ideaHave", i.used.joinToString(", ") { it.name.trim() }), size = 12, color = if (soon.isNotEmpty()) c.high else c.ok)
+    for (m in i.missing) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      val label = if (ru) m.ru else m.en
+      T(dict.t("pantry.ideaMissing", label), Modifier.weight(1f), dim = true, size = 12)
+      val listed = Store.data.shopping.any { it.boughtAt == null && it.name.equals(label, true) }
+      Chip(if (listed) "✓ ${dict["pantry.toShoppingShort"]}" else "+ ${dict["pantry.toShoppingShort"]}", active = listed) { if (!listed) Actions.addShopping(label) }
     }
   }
 }
@@ -487,7 +596,7 @@ private fun PantryForm(item: PantryItem?, prefill: String? = null, onSaved: () -
   val ctx = LocalContext.current
   val lang = dict.lang
   var name by remember { mutableStateOf(item?.name ?: prefill ?: "") }
-  var baseId by remember { mutableStateOf(item?.baseId) }
+  val baseId = item?.baseId
   var per100 by remember { mutableStateOf<Per100?>(item?.per100g) }
   var bought by remember { mutableStateOf(item?.boughtAt ?: todayKey()) }
   var expires by remember { mutableStateOf(item?.expiresAt) }
@@ -515,18 +624,29 @@ private fun PantryForm(item: PantryItem?, prefill: String? = null, onSaved: () -
       showDb = false
     }.padding(vertical = 6.dp), size = 14)
   }
-  T(dict["pantry.base"], dim = true, size = 13)
-  Wrap(6.dp) {
-    for (b in Assets.shelfBases) Chip(baseName(b), active = base.id == b.id) {
-      baseId = b.id
-      // Empty name: use the product type as the name.
-      if (name.isBlank()) name = baseName(b)
-      expires = null
+  T(dict["pantry.term"], dim = true, size = 13)
+  val span = daysBetween(bought, expiry)
+  Grid2(SHELF_TERMS.size, 6.dp) { i, m ->
+    val days = SHELF_TERMS[i]
+    val active = span == days.toLong()
+    Column(
+      m.tap(scaleTo = 0.97f) { expires = addDays(bought, days) }
+        .background(if (active) c.accentSoft else c.cardAlt, RoundedCornerShape(12.dp))
+        .border(1.dp, if (active) c.accent else Color.Transparent, RoundedCornerShape(12.dp))
+        .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+      T(dict["pantry.terms.d$days.label"], size = 14, bold = true, color = if (active) c.accent else null)
+      T(dict["pantry.terms.d$days.ex"], dim = true, size = 11, maxLines = 2)
     }
   }
-  T(dict.t("pantry.baseHint", base.days), dim = true, size = 12)
-  DateStep(dict["pantry.bought"], bought) { bought = it }
-  DateStep(dict["pantry.expires"], expiry) { expires = it }
+  // The guess from the name only sets the starting date; the package date matters more.
+  if (base.id != "other" && expires == null) T(dict.t("pantry.baseHint", baseName(base), base.days), dim = true, size = 12)
+  DateStep(dict["pantry.bought"], bought) { b ->
+    // Keep the chosen shelf life when the purchase day moves.
+    expires = addDays(b, daysBetween(bought, expiry).toInt())
+    bought = b
+  }
+  DateStep(dict["pantry.expires"], expiry) { if (it >= bought) expires = it }
   Toggle(dict["pantry.openedToggle"], opened != null, base.opened?.let { dict.t("pantry.openedHint", it) }) { on ->
     val today = todayKey()
     opened = if (on) today else null
@@ -571,6 +691,76 @@ private fun PantryForm(item: PantryItem?, prefill: String? = null, onSaved: () -
     Button(if (listed) dict["pantry.inShopping"] else dict["pantry.toShopping"], Modifier.fillMaxWidth(), kind = "ghost", icon = if (listed) "check" else "plus", enabled = !listed) {
       Actions.addShopping(item.name)
     }
+  }
+}
+
+// ---- export to an AI chat --------------------------------------------------------------
+
+/** Prompt kinds; texts are pantry.export.<kind>.title / .text with the product list as {0}. */
+private val PROMPTS = listOf("recipes", "menu", "quick", "healthy")
+
+/** Suggested chats; the prompt is copied first, the site only opens (nothing is sent by the app). */
+private val AI_CHATS = listOf(
+  "Le Chat (Mistral)" to "https://chat.mistral.ai/chat",
+  "Claude" to "https://claude.ai/new",
+  "ChatGPT" to "https://chatgpt.com/",
+  "Gemini" to "https://gemini.google.com/app",
+)
+
+/** Products at home as prompt lines: name, what is left and, with [dates], days to expiry; soonest first. */
+private fun pantryLines(items: List<PantryItem>, today: String, dict: io.github.timmylich.wellness.i18n.Dict, dates: Boolean): String =
+  items.filter { it.left > 0 }.sortedBy { it.expiresAt }.joinToString("\n") { p ->
+    val unit = p.unit ?: "g"
+    val amount = p.amountG?.let { " — ${fmt(it * p.left)} ${dict["pantry.units.$unit"]}" } ?: " — ${(p.left * 100).roundToInt()}%"
+    "- ${p.name.trim()}$amount" + if (dates) " (${dict.daysLeft(daysLeft(p, today))})" else ""
+  }
+
+private fun copyText(ctx: android.content.Context, text: String) =
+  (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("prompt", text))
+
+@Composable
+private fun PantryExport() {
+  val dict = L
+  val ctx = LocalContext.current
+  val d = Store.data
+  val today = Today.key
+  var kind by remember { mutableStateOf(PROMPTS[0]) }
+  var dates by remember { mutableStateOf(false) }
+  val list = remember(d.pantry, today, dict, dates) { pantryLines(d.pantry, today, dict, dates) }
+  // Editable copy of the prompt; starts over when the prompt kind or the product list changes.
+  var text by remember(kind, list) { mutableStateOf(dict.t("pantry.export.$kind.text", list)) }
+  val copy = {
+    copyText(ctx, text)
+    Toast.show(dict["pantry.export.copied"])
+  }
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    H(dict["pantry.export.title"], "send")
+    T(dict["pantry.export.hint"], dim = true, size = 12)
+    if (list.isEmpty()) {
+      Empty(dict["pantry.ideasNoFood"])
+      return@Column
+    }
+    Wrap(6.dp) { for (k in PROMPTS) Chip(dict["pantry.export.$k.title"], active = k == kind) { kind = k } }
+    Toggle(dict["pantry.export.dates"], dates) { dates = it }
+    // A window onto the prompt: the field grows inside, the box scrolls with a visible bar.
+    val textScroll = rememberScrollState()
+    Box(Modifier.fillMaxWidth().heightIn(max = 280.dp).clip(RoundedCornerShape(12.dp)).scrollbar(textScroll, c.accent).verticalScroll(textScroll)) {
+      Field(text, { text = it }, Modifier.fillMaxWidth(), numeric = false, multiline = true)
+    }
+    HRow {
+      Button(dict["pantry.export.copy"], Modifier.weight(1f), kind = "secondary", icon = "copy") { copy() }
+      Button(dict["pantry.share.send"], Modifier.weight(1f), kind = "secondary", icon = "send") {
+        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
+      }
+    }
+    T(dict["pantry.export.where"], Modifier.padding(top = 4.dp), bold = true, size = 14)
+    Wrap(6.dp) {
+      for ((name, url) in AI_CHATS) Chip(name, icon = "globe") {
+        copy()
+        openUrl(ctx, url)
+      }
+    }
+    T(dict["pantry.export.privacy"], dim = true, size = 11)
   }
 }
 

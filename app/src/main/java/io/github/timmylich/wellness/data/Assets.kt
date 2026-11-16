@@ -101,6 +101,9 @@ object Assets {
     return shelfBases.firstOrNull { b -> b.match.any { n.contains(it) } }
   }
 
+  /** Simple dishes for the pantry's "Ideas" page. */
+  val recipes: List<io.github.timmylich.wellness.lib.Recipe> by lazy { json.decodeFromString(read("recipes.json")) }
+
   private var workouts: WorkoutsFile? = null
 
   private fun workoutsFile(c: Context): WorkoutsFile = workouts ?: json.decodeFromString<WorkoutsFile>(read("workouts.json", c)).also { workouts = it }

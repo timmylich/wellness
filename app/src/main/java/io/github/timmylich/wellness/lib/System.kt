@@ -27,6 +27,7 @@ import io.github.timmylich.wellness.data.Store
 import io.github.timmylich.wellness.data.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -56,9 +57,11 @@ object Reminders {
   /** Stable positive id from a string key (same as 0.5.x, so old alarms can be cancelled). */
   fun id(key: String): Int = abs(key.hashCode()).takeIf { it > 0 } ?: 1
 
-  fun show(c: Context, key: String, title: String, body: String, url: String? = null) = show(c, id(key), title, body, url)
+  /** [actions]: button label to the URL it opens. */
+  fun show(c: Context, key: String, title: String, body: String, url: String? = null, actions: List<Pair<String, String>> = emptyList()) =
+    show(c, id(key), title, body, url, actions)
 
-  private fun show(c: Context, id: Int, title: String, body: String, url: String?) {
+  private fun show(c: Context, id: Int, title: String, body: String, url: String?, actions: List<Pair<String, String>> = emptyList()) {
     val nm = c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     nm.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Reminders", NotificationManager.IMPORTANCE_DEFAULT))
     val open = if (url != null) Intent(Intent.ACTION_VIEW, Uri.parse(url)) else c.packageManager.getLaunchIntentForPackage(c.packageName)
@@ -70,6 +73,12 @@ object Reminders {
       .setStyle(Notification.BigTextStyle().bigText(body))
       .setAutoCancel(true)
       .setContentIntent(pi)
+      .apply {
+        actions.forEachIndexed { i, (label, link) ->
+          val a = PendingIntent.getActivity(c, id * 4 + i + 1, Intent(Intent.ACTION_VIEW, Uri.parse(link)), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+          addAction(Notification.Action.Builder(null, label, a).build())
+        }
+      }
       .build()
     try {
       nm.notify(id, n)
@@ -131,7 +140,8 @@ object Updates {
     return false
   }
 
-  data class Release(val version: String, val url: String)
+  /** [apk]: direct download of the release's APK, when one is attached. */
+  data class Release(val version: String, val url: String, val apk: String? = null)
 
   /** Latest published release, or null on network errors. */
   suspend fun fetchLatest(): Release? = withContext(Dispatchers.IO) {
@@ -145,7 +155,10 @@ object Updates {
         val j = json.parseToJsonElement(c.inputStream.bufferedReader().use { it.readText() }) as JsonObject
         val tag = (j["tag_name"] as? JsonPrimitive)?.contentOrNull ?: return@runCatching null
         if ((j["draft"] as? JsonPrimitive)?.booleanOrNull == true || (j["prerelease"] as? JsonPrimitive)?.booleanOrNull == true) return@runCatching null
-        Release(tag.removePrefix("v").removePrefix("V"), (j["html_url"] as? JsonPrimitive)?.contentOrNull ?: "$REPO_URL/releases/latest")
+        val apk = (j["assets"] as? JsonArray)?.firstNotNullOfOrNull { a ->
+          ((a as? JsonObject)?.get("browser_download_url") as? JsonPrimitive)?.contentOrNull?.takeIf { it.endsWith(".apk") && it.startsWith("https://github.com/") }
+        }
+        Release(tag.removePrefix("v").removePrefix("V"), (j["html_url"] as? JsonPrimitive)?.contentOrNull ?: "$REPO_URL/releases/latest", apk)
       } finally {
         c.disconnect()
       }
@@ -153,7 +166,7 @@ object Updates {
   }
 
   /** At most once a day, when enabled; notifies once per new version. */
-  suspend fun maybeCheck(c: Context, title: String, body: (String) -> String) {
+  suspend fun maybeCheck(c: Context, dict: io.github.timmylich.wellness.i18n.Dict) {
     val s = Store.data
     val n = s.settings.notifications
     if (!builtIn || !n.enabled || !n.updates) return
@@ -162,7 +175,8 @@ object Updates {
     val latest = fetchLatest()
     Actions.updateMeta { it.copy(updateCheckedAt = System.currentTimeMillis()) }
     if (latest == null || !isNewer(latest.version, current) || s.meta.updateNotified == latest.version) return
-    Reminders.show(c, "update-${latest.version}", title, body(latest.version), latest.url)
+    val buttons = listOfNotNull(dict["settings.updateGitHub"] to latest.url, latest.apk?.let { dict["settings.updateApk"] to it })
+    Reminders.show(c, "update-${latest.version}", dict["settings.updateTitle"], dict.t("settings.updateBody", latest.version), latest.url, buttons)
     Actions.updateMeta { it.copy(updateNotified = latest.version) }
   }
 }

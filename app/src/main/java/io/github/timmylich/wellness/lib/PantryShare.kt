@@ -25,6 +25,7 @@ import io.github.timmylich.wellness.data.ShoppingItem
 import io.github.timmylich.wellness.data.Store
 import io.github.timmylich.wellness.data.json
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -341,6 +342,7 @@ object PantryShare {
         if (!sameData(merged, loc)) {
           apply(merged)
           changed = true
+          announce(incoming(loc.s.map { it.id }.toSet(), merged.s, announced()), merged.s).let { if (it.isNotEmpty()) onIncoming?.invoke(it) }
         }
         if (same(merged, remote.items)) return changed.also { save(code, remote.items, remote.version) }
         when (val v = rpc("pantry_share_put", mapOf("p_id" to idOf(code), "p_data" to seal(code, merged), "p_version" to remote.version)).trim().toIntOrNull()) {
@@ -363,5 +365,81 @@ object PantryShare {
   private fun gone() {
     save(null, Shared(), 0)
     markExpired(true)
+  }
+
+  // ---- shopping items added on other phones ------------------------------------------------
+
+  /** Names of shopping items others added, from a sync while the app is open (main thread). */
+  var onIncoming: ((List<String>) -> Unit)? = null
+
+  private fun announced(): Set<String> = prefs.getStringSet("announced", emptySet()).orEmpty()
+
+  /** Unbought items of [list] that this phone did not have ([known] ids) and has not announced. */
+  internal fun incoming(known: Set<String>, list: List<ShoppingItem>, announced: Set<String>) =
+    list.filter { it.boughtAt == null && it.id !in known && it.id !in announced }
+
+  /** Remembers [items] as announced (only ids still on [list] are kept) and returns their names. */
+  private fun announce(items: List<ShoppingItem>, list: List<ShoppingItem>): List<String> {
+    if (items.isEmpty()) return emptyList()
+    val onList = list.map { it.id }.toSet()
+    prefs.edit().putStringSet("announced", announced().filter { it in onList }.toSet() + items.map { it.id }).apply()
+    return items.map { it.name }
+  }
+
+  /**
+   * Background check (alarm): reads the server only and never touches AppData, which may not be
+   * loaded in a process started by the alarm. The next sync in the app merges as usual.
+   */
+  suspend fun incomingInBackground(): List<String> {
+    val code = code ?: return emptyList()
+    val remote = fetch(code, version) ?: return emptyList()
+    return announce(incoming(base.s.map { it.id }.toSet(), remote.items.s, announced()), remote.items.s)
+  }
+
+  private const val WATCH_ID = 7301
+
+  /**
+   * Turns the background check on or off (about every 30 minutes, not waking the phone: Android
+   * runs it when the phone is awake anyway). [lang] is kept for the notification text.
+   */
+  fun watch(c: Context, on: Boolean, lang: String) {
+    prefs.edit().putBoolean("watch", on).putString("lang", lang).apply()
+    schedule(c)
+  }
+
+  private fun schedule(c: Context) {
+    val am = c.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+    val pi = android.app.PendingIntent.getBroadcast(
+      c, WATCH_ID, android.content.Intent(c, ShoppingWatch::class.java),
+      android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+    val half = android.app.AlarmManager.INTERVAL_HALF_HOUR
+    if (prefs.getBoolean("watch", false) && code != null) am.setInexactRepeating(android.app.AlarmManager.ELAPSED_REALTIME, android.os.SystemClock.elapsedRealtime() + half, half, pi)
+    else am.cancel(pi)
+  }
+
+  internal fun watchLang(): String = prefs.getString("lang", null) ?: "ru"
+
+  /** After a reboot or an update alarms are gone; the app process start sets it again. */
+  fun rewatch(c: Context) = schedule(c)
+}
+
+/** Alarm for [PantryShare.incomingInBackground]: a notification for items others added. */
+class ShoppingWatch : android.content.BroadcastReceiver() {
+  override fun onReceive(c: Context, intent: android.content.Intent) {
+    val done = goAsync()
+    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+      try {
+        val names = kotlinx.coroutines.withTimeout(25_000) { PantryShare.incomingInBackground() }
+        if (names.isNotEmpty()) {
+          val dict = io.github.timmylich.wellness.i18n.Dict.of(c, if (PantryShare.watchLang() == "en") io.github.timmylich.wellness.i18n.Lang.En else io.github.timmylich.wellness.i18n.Lang.Ru)
+          Reminders.show(c, "shopping-incoming", dict["pantry.share.incomingTitle"], names.joinToString(", "))
+        }
+      } catch (_: Exception) {
+        // Offline or the server is busy: the next alarm tries again.
+      } finally {
+        done.finish()
+      }
+    }
   }
 }

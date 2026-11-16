@@ -69,6 +69,9 @@
     <receiver
       android:name=".lib.ReminderReceiver"
       android:exported="false" />
+    <receiver
+      android:name=".lib.ShoppingWatch"
+      android:exported="false" />
 
     <!-- Camera photos for health records are written here before being kept. -->
     <provider

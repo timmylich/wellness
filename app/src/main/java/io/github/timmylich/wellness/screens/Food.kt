@@ -5,6 +5,7 @@
 package io.github.timmylich.wellness.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,11 +42,14 @@ import io.github.timmylich.wellness.lib.lookupBarcode
 import io.github.timmylich.wellness.lib.mergeResults
 import io.github.timmylich.wellness.lib.searchLocal
 import io.github.timmylich.wellness.lib.searchOnline
+import io.github.timmylich.wellness.lib.Today
+import io.github.timmylich.wellness.lib.humanDate
 import io.github.timmylich.wellness.lib.todayKey
 import io.github.timmylich.wellness.ui.AmountForm
 import io.github.timmylich.wellness.ui.AppSheet
 import io.github.timmylich.wellness.ui.Button
 import io.github.timmylich.wellness.ui.Card
+import io.github.timmylich.wellness.ui.DateStep
 import io.github.timmylich.wellness.ui.Empty
 import io.github.timmylich.wellness.ui.Field
 import io.github.timmylich.wellness.ui.Grid2
@@ -111,7 +115,7 @@ fun FoodSearch(dateArg: String?) {
   val ctx = LocalContext.current
   val scope = rememberCoroutineScope()
   val d = Store.data
-  val date = dateArg ?: todayKey()
+  var date by rememberSaveable { mutableStateOf(dateArg ?: Today.key) }
   val online = d.settings.onlineFoodSearch
   var query by rememberSaveable { mutableStateOf("") }
   var tab by rememberSaveable { mutableStateOf("recent") }
@@ -158,6 +162,12 @@ fun FoodSearch(dateArg: String?) {
   val list: @Composable (List<Food>) -> Unit = { foods -> for (f in foods) androidx.compose.runtime.key(f.id) { FoodRow(f, f.id in d.favorites) { selected = f } } }
 
   Screen(dict["nutrition.addFood"]) {
+    // Opened from an earlier day: say so, and let the day be changed right here.
+    if (date != Today.key) Card(Modifier.border(1.5.dp, c.high, RoundedCornerShape(18.dp))) {
+      T(dict.t("food.forDate", humanDate(date, dict)), bold = true, color = c.high)
+      DateStep(dict["common.date"], date) { if (it <= Today.key) date = it }
+      Button(dict["food.toToday"], Modifier.fillMaxWidth(), kind = "ghost") { date = Today.key }
+    }
     Field(query, { query = it }, Modifier.fillMaxWidth(), numeric = false, placeholder = dict["food.searchPlaceholder"], search = true)
     HRow {
       Button(dict["food.create"], Modifier.weight(1f), kind = "secondary", icon = "plus") { Nav.push(Route.FoodEdit()) }

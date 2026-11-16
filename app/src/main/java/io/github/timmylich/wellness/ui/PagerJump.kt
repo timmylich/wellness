@@ -26,6 +26,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.round
 import kotlin.math.sign
 
 private const val JUMP_MS = 320
@@ -110,27 +113,43 @@ fun rememberPagerJump(pager: PagerState): PagerJump {
 }
 
 /**
- * Nested-scroll guard for a pager inside another pager. The inner pager's leftover drag and fling
- * are consumed here, so they never half-move the outer pager (it could stick midway); a pull past
- * the inner edge longer than 56 dp steps [outer] to its neighbour instead.
+ * Nested scroll for a pager inside another pager. A drag past the inner pager's edge moves the
+ * [outer] pager with the finger (its own swipes are off); once the outer pager is out of rest the
+ * drag moves it first, either way. On release it settles to the nearest page, or the next one in
+ * the fling direction. Leftovers never reach the outer pager's own scrolling, so it cannot stick.
  */
 @Composable
 fun rememberEdgeSwipe(outer: PagerJump?): NestedScrollConnection {
-  val edgePx = with(LocalDensity.current) { 56.dp.toPx() }
-  return remember(outer, edgePx) {
+  val flingPx = with(LocalDensity.current) { 400.dp.toPx() }
+  return remember(outer, flingPx) {
     object : NestedScrollConnection {
-      var pulled = 0f
-      override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-        if (source == NestedScrollSource.UserInput) pulled += available.x
+      fun moved() = outer != null && abs(outer.pager.currentPageOffsetFraction) > 0.001f
+
+      override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || !moved()) return Offset.Zero
+        outer!!.pager.dispatchRawDelta(-available.x)
         return Offset(available.x, 0f)
       }
-      override suspend fun onPreFling(available: Velocity): Velocity = Velocity.Zero
-      override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-        val p = pulled
-        pulled = 0f
-        if (p > edgePx) outer?.step(-1) else if (p < -edgePx) outer?.step(1)
+
+      override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (source == NestedScrollSource.UserInput) outer?.pager?.dispatchRawDelta(-available.x)
+        return Offset(available.x, 0f)
+      }
+
+      override suspend fun onPreFling(available: Velocity): Velocity {
+        if (!moved()) return Velocity.Zero
+        val p = outer!!.pager
+        val pos = p.currentPage + p.currentPageOffsetFraction
+        val target = when {
+          available.x < -flingPx -> ceil(pos)
+          available.x > flingPx -> floor(pos)
+          else -> round(pos)
+        }.toInt().coerceIn(0, p.pageCount - 1)
+        p.animateScrollToPage(target)
         return Velocity(available.x, 0f)
       }
+
+      override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity = Velocity(available.x, 0f)
     }
   }
 }

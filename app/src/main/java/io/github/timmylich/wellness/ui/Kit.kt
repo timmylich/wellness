@@ -48,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
@@ -351,6 +353,32 @@ fun Field(
     if (hint != null) T(hint, dim = true, size = 12)
   }
 }
+
+/**
+ * Thin scroll bar for a [androidx.compose.foundation.verticalScroll] box; put it before the scroll
+ * modifier. The bar keeps clear of rounded corners ([inset] at both ends), and a box that can
+ * scroll keeps its drags and flings: reaching the end of the text does not scroll the page.
+ */
+fun Modifier.scrollbar(s: androidx.compose.foundation.ScrollState, color: Color, inset: androidx.compose.ui.unit.Dp = 10.dp): Modifier = this
+  .nestedScroll(
+    object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+      override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource) =
+        if (s.maxValue > 0) available.copy(x = 0f) else androidx.compose.ui.geometry.Offset.Zero
+
+      override suspend fun onPostFling(consumed: androidx.compose.ui.unit.Velocity, available: androidx.compose.ui.unit.Velocity) =
+        if (s.maxValue > 0) available.copy(x = 0f) else androidx.compose.ui.unit.Velocity.Zero
+    },
+  )
+  .drawWithContent {
+    drawContent()
+    if (s.maxValue <= 0) return@drawWithContent
+    val w = 4.dp.toPx()
+    val pad = inset.toPx()
+    val track = size.height - 2 * pad
+    val h = (track * size.height / (size.height + s.maxValue)).coerceIn(24.dp.toPx().coerceAtMost(track), track)
+    val y = pad + (track - h) * s.value / s.maxValue
+    drawRoundRect(color.copy(alpha = 0.7f), androidx.compose.ui.geometry.Offset(size.width - w - 4.dp.toPx(), y), androidx.compose.ui.geometry.Size(w, h), androidx.compose.ui.geometry.CornerRadius(w / 2))
+  }
 
 /** Row with a label and an app-styled switch; the whole row is tappable. */
 @Composable

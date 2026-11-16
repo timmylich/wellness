@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,7 +77,7 @@ private val TAB_ICONS = mapOf("tips" to "tips", "pantry" to "pantry", "overview"
 /** Lets the overview move the outer tab pager when swiped past its edge. */
 val LocalTabs = compositionLocalOf<PagerJump?> { null }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun Tabs() {
   val sections = Store.data.settings
@@ -111,7 +113,9 @@ private fun Tabs() {
         }
         }
       }
-      BottomBar(tabs, jump)
+      // Hidden while the keyboard is up: pages pad for the keyboard from the screen bottom, so the bar
+      // would leave an empty strip of its height above the keyboard.
+      if (!WindowInsets.isImeVisible) BottomBar(tabs, jump)
     }
   }
 }

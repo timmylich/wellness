@@ -189,6 +189,8 @@ data class NotificationSettings(
   val enabled: Boolean = false,
   /** Remind before pantry products expire. */
   val expiry: Boolean = true,
+  /** Tell when another phone on the shared pantry adds to the shopping list. */
+  val shopping: Boolean = true,
   /** Check GitHub Releases for a newer version. */
   val updates: Boolean = true,
 )
