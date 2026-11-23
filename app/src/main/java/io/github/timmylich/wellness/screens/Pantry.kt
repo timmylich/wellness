@@ -58,10 +58,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.draw.drawBehind
 import io.github.timmylich.wellness.ui.scrollbar
 import androidx.compose.ui.draw.scale
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -190,10 +191,13 @@ data class PantryStats(val eaten: Int, val wasted: Int, val lossPct: Int, val to
 fun pantryStats(log: List<PantryOutcome>, today: String = todayKey(), days: Int = 30): PantryStats {
   val from = addDays(today, -(days - 1))
   val recent = log.filter { it.date >= from }
+  // Partial outcomes are pieces of a product finished later: their thrown share counts, the product once.
+  val whole = recent.filter { it.partial != true }
   val wasted = recent.filter { it.kind == "wasted" }
-  val loss = if (recent.isEmpty()) 0 else (wasted.sumOf { it.share } / recent.size * 100).roundToInt()
+  val loss = if (whole.isEmpty()) 0 else (wasted.sumOf { it.share } / whole.size * 100).roundToInt().coerceAtMost(100)
   val top = wasted.groupBy { it.name.trim().lowercase() }.values.map { it.first().name.trim() to it.size }.sortedByDescending { it.second }.take(3)
-  return PantryStats(recent.size - wasted.size, wasted.size, loss, top)
+  val thrown = whole.count { it.kind == "wasted" }
+  return PantryStats(whole.size - thrown, thrown, loss, top)
 }
 
 /** Reminder at 10:00 the day before expiry, if enabled. */
@@ -226,12 +230,25 @@ fun Pantry() {
         dict["pantry.tabExport"],
         dict["pantry.tabStats"],
       )
-      // The selected tab chip scrolls into view when the pages are swiped.
-      val chips = remember { List(PAGES.size) { androidx.compose.foundation.relocation.BringIntoViewRequester() } }
-      LaunchedEffect(jump.target) { chips[jump.target].bringIntoView() }
-      Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      // The selected tab chip scrolls into view when the pages are swiped. Only this row scrolls:
+      // bringIntoView would also move the outer tab pager (it opened Pantry at start-up).
+      val chipScroll = rememberScrollState()
+      val spans = remember { arrayOfNulls<IntRange>(PAGES.size) }
+      LaunchedEffect(jump.target) {
+        val r = spans[jump.target] ?: return@LaunchedEffect
+        val view = chipScroll.viewportSize
+        val to = when {
+          r.first < chipScroll.value -> r.first
+          r.last > chipScroll.value + view -> r.last - view
+          else -> return@LaunchedEffect
+        }
+        chipScroll.animateScrollTo(to)
+      }
+      Row(Modifier.horizontalScroll(chipScroll), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         labels.forEachIndexed { i, l ->
-          Box(Modifier.bringIntoViewRequester(chips[i])) { Chip(l, active = jump.target == i) { jump.go(i) } }
+          Box(Modifier.onGloballyPositioned { spans[i] = it.positionInParent().x.toInt()..(it.positionInParent().x.toInt() + it.size.width) }) {
+            Chip(l, active = jump.target == i) { jump.go(i) }
+          }
         }
       }
     }
@@ -295,7 +312,7 @@ private fun ShareSync() {
 private class Zeroed(val deadline: Long, val leftBefore: Double)
 
 /** A product just marked eaten / thrown away, kept on screen a few seconds for "to shopping list" and undo. */
-private class Ghost(val item: PantryItem, val outcomeId: String, val kind: String, val until: Long)
+private class Ghost(val item: PantryItem, val outcomeIds: List<String>, val kind: String, val until: Long)
 
 /** How long a marked product stays visible after "eaten" / "thrown away". */
 private const val GHOST_MS = 6000L
@@ -331,7 +348,16 @@ private fun PantryHome() {
     val oid = uid()
     Reminders.cancel(ctx, "pantry-${p.id}")
     Actions.finishPantryItem(item, kind, oid, PantryShare.author())
-    ghosts[p.id] = Ghost(item, oid, kind, System.currentTimeMillis() + GHOST_MS)
+    ghosts[p.id] = Ghost(item, listOf(oid), kind, System.currentTimeMillis() + GHOST_MS)
+  }
+  // Partly eaten, partly thrown away ([wasted]: share of the package).
+  val split = { p: PantryItem, wasted: Double ->
+    val z = zeroed.remove(p.id)
+    val item = if (z != null) p.copy(left = z.leftBefore) else p
+    val ids = listOf(uid(), uid())
+    Reminders.cancel(ctx, "pantry-${p.id}")
+    Actions.finishSplit(item, wasted, ids[0], ids[1], PantryShare.author())
+    ghosts[p.id] = Ghost(item, ids, "eaten", System.currentTimeMillis() + GHOST_MS)
   }
 
   AnimatedVisibility(bought.isNotEmpty(), enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
@@ -388,6 +414,10 @@ private fun PantryHome() {
         onZero = { before -> zeroed[p.id] = Zeroed(System.currentTimeMillis() + REMOVE_DELAY_MS, before) },
         onRevive = { zeroed.remove(p.id) },
         onFinish = { kind -> finish(p, kind) },
+        leftBefore = zeroed[p.id]?.leftBefore,
+        // Adjusting the eaten / thrown split stops the countdown until it is saved.
+        onHold = { zeroed[p.id]?.let { z -> if (z.deadline != Long.MAX_VALUE) zeroed[p.id] = Zeroed(Long.MAX_VALUE, z.leftBefore) } },
+        onSplit = { wasted -> split(p, wasted) },
       )
     }
   }
@@ -434,7 +464,7 @@ private fun GhostRow(g: Ghost, onGone: () -> Unit) {
       val listed = Store.data.shopping.any { it.boughtAt == null && it.name.equals(g.item.name, true) }
       Chip(if (listed) "✓ ${dict["pantry.toShoppingShort"]}" else "+ ${dict["pantry.toShoppingShort"]}", active = listed) { if (!listed) Actions.addShopping(g.item.name) }
       T(dict["pantry.undo"], Modifier.tap {
-        Actions.undoFinish(g.item, g.outcomeId)
+        Actions.undoFinish(g.item, g.outcomeIds)
         onGone()
       }.padding(vertical = 6.dp), size = 14, bold = true, color = c.accent)
     }
@@ -452,7 +482,10 @@ private fun RoundIcon(icon: String, enabled: Boolean = true, onClick: () -> Unit
   }
 
 @Composable
-private fun PantryRow(item: PantryItem, today: String, removeAt: Long?, onEdit: () -> Unit, onZero: (Double) -> Unit, onRevive: () -> Unit, onFinish: (String) -> Unit) {
+private fun PantryRow(
+  item: PantryItem, today: String, removeAt: Long?, onEdit: () -> Unit, onZero: (Double) -> Unit, onRevive: () -> Unit, onFinish: (String) -> Unit,
+  leftBefore: Double?, onHold: () -> Unit, onSplit: (Double) -> Unit,
+) {
   val dict = L
   val ctx = LocalContext.current
   val (used, state) = freshness(item, today)
@@ -529,10 +562,22 @@ private fun PantryRow(item: PantryItem, today: String, removeAt: Long?, onEdit: 
         }
         AnimatedVisibility(removeAt != null && item.left <= 0, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
           Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            T(dict.t("pantry.finishedAsk", max(0L, ceil(((removeAt ?: now) - now) / 1000.0).toLong())), size = 13)
-            HRow {
+            val before = leftBefore ?: 1.0
+            val held = removeAt == Long.MAX_VALUE
+            // Share of the package eaten; the rest of what was left counts as thrown away.
+            var eaten by remember(item.id, before) { mutableStateOf(before) }
+            T(if (held) dict["pantry.finishedSplit"] else dict.t("pantry.finishedAsk", max(0L, ceil(((removeAt ?: now) - now) / 1000.0).toLong())), size = 13)
+            T(dict.t("pantry.split", (eaten * 100).roundToInt(), ((before - eaten) * 100).roundToInt()), dim = true, size = 12)
+            Slider(eaten, 0.0, before, 0.01, onChange = { eaten = it; onHold() }, haptics = false, grabThumb = true, thumb = 24.dp)
+            if (!held) HRow {
               Button(dict["pantry.eaten"], Modifier.weight(1f), kind = "secondary", icon = "check") { onFinish("eaten") }
               Button(dict["pantry.wasted"], Modifier.weight(1f), kind = "danger", icon = "trash") { onFinish("wasted") }
+            } else Button(dict["pantry.save"], Modifier.fillMaxWidth(), icon = "check") {
+              when {
+                eaten >= before - 0.005 -> onFinish("eaten")
+                eaten <= 0.005 -> onFinish("wasted")
+                else -> onSplit(before - eaten)
+              }
             }
             val listed = Store.data.shopping.any { it.boughtAt == null && it.name.equals(item.name, true) }
             Chip(if (listed) "✓ ${dict["pantry.inShopping"]}" else "+ ${dict["pantry.toShopping"]}", active = listed) { Actions.addShopping(item.name) }
@@ -679,9 +724,28 @@ private fun PantryForm(item: PantryItem?, prefill: String? = null, onSaved: () -
     }
   }
   if (item != null) {
+    val cur = Store.data.pantry.firstOrNull { it.id == item.id } ?: item
+    // How much is eaten / thrown away: all that is left by default, or a part of it.
+    val pcs = cur.amountG?.takeIf { unitV in COUNTED && it >= 1 }
+    val step = pcs?.let { 1 / it } ?: 0.01
+    var part by remember { mutableStateOf(cur.left) }
+    val whole = part >= cur.left - step / 2
     val finish = { kind: String ->
-      onFinish(Store.data.pantry.firstOrNull { it.id == item.id } ?: item, kind)
+      if (whole) onFinish(cur, kind)
+      else {
+        Actions.usePantryPart(cur, kind, part, PantryShare.author())
+        Toast.show(dict.t("pantry.partDone", dict[if (kind == "wasted") "pantry.wasted" else "pantry.eaten"], (part * 100).roundToInt()))
+      }
       onDone()
+    }
+    if (cur.left > step * 1.5) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+      val amount = when {
+        pcs != null -> " · ${(part * pcs).roundToInt()} ${dict["pantry.units.$unitV"]}"
+        cur.amountG != null -> " · ${fmt(part * cur.amountG)} ${dict["pantry.units.$unitV"]}"
+        else -> ""
+      }
+      T(if (whole) dict["pantry.partAll"] + amount else dict.t("pantry.part", (part * 100).roundToInt()) + amount, dim = true, size = 13)
+      Slider(part, step, cur.left, step, onChange = { part = it })
     }
     HRow {
       Button(dict["pantry.eaten"], Modifier.weight(1f), kind = "secondary", icon = "check") { finish("eaten") }
@@ -925,7 +989,7 @@ private fun History() {
             T(o.name, maxLines = 1)
             if (o.by != null) T(o.by, dim = true, size = 12, maxLines = 1)
           }
-          T(if (wasted) "${dict["pantry.wasted"]} ${(o.share * 100).roundToInt()}%" else dict["pantry.eaten"], dim = true, size = 13)
+          T(dict[if (wasted) "pantry.wasted" else "pantry.eaten"] + if (wasted || o.partial == true) " ${(o.share * 100).roundToInt()}%" else "", dim = true, size = 13)
         }
       }
     }
@@ -940,14 +1004,15 @@ private fun OutcomeForm(o: PantryOutcome, onDone: () -> Unit) {
   val dict = L
   var name by remember { mutableStateOf(o.name) }
   var kind by remember { mutableStateOf(o.kind) }
-  var share by remember { mutableStateOf(if (o.kind == "wasted") o.share else 1.0) }
+  var share by remember { mutableStateOf(if (o.kind == "wasted" || o.partial == true) o.share else 1.0) }
+  val withShare = kind == "wasted" || o.partial == true
   var date by remember { mutableStateOf(o.date) }
   SheetTitle(dict["pantry.historyEdit"])
   Field(name, { name = it }, Modifier.fillMaxWidth(), label = dict["pantry.name"], numeric = false)
   Segmented(kind, listOf("eaten" to dict["pantry.eaten"], "wasted" to dict["pantry.wasted"])) { kind = it }
-  AnimatedVisibility(kind == "wasted", enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+  AnimatedVisibility(withShare, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-      T(dict.t("pantry.wastedShare", (share * 100).roundToInt()), dim = true, size = 13)
+      T(dict.t(if (o.partial == true) "pantry.part" else "pantry.wastedShare", (share * 100).roundToInt()), dim = true, size = 13)
       Slider(share, 0.05, 1.0, 0.05, onChange = { share = it })
     }
   }
@@ -959,7 +1024,7 @@ private fun OutcomeForm(o: PantryOutcome, onDone: () -> Unit) {
       showDialog(dict["pantry.historyDeleted"], o.name, "trash", listOf(DialogButton(dict["pantry.undo"], "secondary") { Actions.restoreOutcome(o) }, DialogButton(dict["common.done"], "primary")))
     }
     Button(dict["pantry.save"], Modifier.weight(2f), enabled = name.isNotBlank()) {
-      Actions.updateOutcome(o.copy(name = name.trim(), kind = kind, share = if (kind == "wasted") share else 1.0, date = date))
+      Actions.updateOutcome(o.copy(name = name.trim(), kind = kind, share = if (withShare) share else 1.0, date = date))
       onDone()
     }
   }

@@ -1,7 +1,12 @@
 /** Overview sections: Summary, Nutrition, Water, Activity, Heart, Body. */
 package io.github.timmylich.wellness.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -47,7 +52,20 @@ import io.github.timmylich.wellness.data.Store
 import io.github.timmylich.wellness.data.WaterEntry
 import io.github.timmylich.wellness.data.WorkoutEntry
 import io.github.timmylich.wellness.data.WorkoutTemplate
+import io.github.timmylich.wellness.data.ActivityReminder
+import io.github.timmylich.wellness.data.uid
 import io.github.timmylich.wellness.lib.BASELINE_STEPS
+import io.github.timmylich.wellness.lib.FILL_PRESETS
+import io.github.timmylich.wellness.lib.fillFood
+import io.github.timmylich.wellness.lib.underLogged
+import io.github.timmylich.wellness.ui.DateStep
+import io.github.timmylich.wellness.ui.Field
+import io.github.timmylich.wellness.ui.SheetTitle
+import io.github.timmylich.wellness.ui.Toast
+import io.github.timmylich.wellness.ui.Toggle
+import io.github.timmylich.wellness.ui.Wheel
+import io.github.timmylich.wellness.ui.Wrap
+import io.github.timmylich.wellness.ui.range
 import io.github.timmylich.wellness.lib.HealthConnect
 import io.github.timmylich.wellness.lib.KCAL_PER_KG_FAT
 import io.github.timmylich.wellness.lib.Nutrients
@@ -172,6 +190,44 @@ private fun PeriodPicker(value: Int, onChange: (Int) -> Unit) =
 
 // ---- summary ---------------------------------------------------------------------------
 
+/**
+ * Yesterday has under a quarter of the calorie target logged (most likely just not written down):
+ * offer an estimated day instead of a gap. Asked once per day, only to people who log food.
+ */
+@Composable
+private fun AutofillOffer() {
+  val d = Store.data
+  val dict = L
+  val y = addDays(Today.key, -1)
+  // Only for people who log food: something logged in the two weeks before.
+  val logs = remember(d.foodLog, y) { d.foodLog.any { it.date < y && it.date >= addDays(y, -14) } }
+  val day = daySummary(d, y)
+  val target = day.targets.getValue(Nutrient.Kcal).target
+  // The answer is applied once the card has slid away, so it does not change while leaving.
+  val shown = remember(y) { MutableTransitionState(true) }
+  var pending by remember(y) { mutableStateOf<(() -> Unit)?>(null) }
+  LaunchedEffect(shown.isIdle, shown.currentState) {
+    if (shown.isIdle && !shown.currentState) pending?.let { it(); pending = null }
+  }
+  if (pending == null && (d.meta.autofillAsked == y || !logs || !underLogged(day.totals.kcal, target))) return
+  val answer = { action: () -> Unit ->
+    pending = { action(); Actions.updateMeta { it.copy(autofillAsked = y) } }
+    shown.targetState = false
+  }
+  AnimatedVisibility(shown, exit = fadeOut() + shrinkVertically()) { Card {
+    H(dict["autofill.title"], "nutrition")
+    T(dict.t("autofill.text", fmt(day.totals.kcal), fmt(target)), dim = true, size = 13)
+    Wrap(6.dp) {
+      for (p in FILL_PRESETS) Chip(dict["autofill.presets.${p.key}"]) {
+        val fill = fillFood(p, target, day.totals.kcal, dict.t("autofill.food", dict["autofill.presets.${p.key}"]))
+        answer { fill?.let { (f, g) -> Actions.logFood(f, g, "lunch", y) } }
+        Toast.show(dict["autofill.done"])
+      }
+    }
+    Button(dict["autofill.no"], Modifier.fillMaxWidth(), kind = "ghost") { answer {} }
+  } }
+}
+
 @Composable
 fun Summary(onOpen: (String) -> Unit) {
   val d = Store.data
@@ -193,6 +249,7 @@ fun Summary(onOpen: (String) -> Unit) {
   val kcal = day.targets.getValue(Nutrient.Kcal)
   val left = kcal.target - day.totals.kcal
 
+  if (s.section("nutrition")) AutofillOffer()
   if (s.section("nutrition")) Card(Modifier.tap(scaleTo = 0.98f) { onOpen("nutrition") }) {
     H(dict["summary.calories"], "nutrition")
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -590,6 +647,7 @@ fun Activity() {
   var sheet by remember { mutableStateOf<ActivitySheet?>(null) }
   var editing by remember { mutableStateOf<WorkoutEntry?>(null) }
   var syncedAt by remember { mutableStateOf<Long?>(null) }
+  var reminder by remember { mutableStateOf<ActivityReminder?>(null) }
   val s = d.settings
   val steps = d.steps[date] ?: 0.0
   val workouts = d.workouts.filter { it.date == date }
@@ -638,6 +696,22 @@ fun Activity() {
     H(dict["activity.byDay"], right = { PeriodPicker(period) { period = it } })
     BarChart(chart.map { (l, v) -> BarDatum(l, v, if (v >= s.stepGoal) c.ok else c.accent) }, target = s.stepGoal)
   }
+  Card {
+    H(dict["activity.remind.title"], "bell", right = { T("+ ${dict["activity.remind.add"]}", Modifier.tap { reminder = ActivityReminder(uid(), start = Today.key) }, color = c.accent) })
+    T(dict["activity.remind.hint"], dim = true, size = 13)
+    if (!s.notifications.enabled && d.activityReminders.isNotEmpty()) {
+      T(dict["activity.remind.notifOff"], color = c.high, size = 13)
+      Button(dict["activity.remind.notifOn"], Modifier.fillMaxWidth(), kind = "secondary", icon = "bell") { Nav.push(Route.Settings("notifications")) }
+    }
+    if (d.activityReminders.isEmpty()) Empty(dict["activity.remind.empty"])
+    for (r in d.activityReminders) ListItem(
+      if (r.kind == "steps") dict.t("activity.remind.stepsItem", fmt(r.steps)) else r.text.ifBlank { dict["activity.remind.taskTitle"] },
+      (if (r.everyDays <= 1) dict["activity.remind.daily"] else dict.t("activity.remind.everyN", r.everyDays)) + ", " + clock(r.hour, r.minute),
+      right = if (r.on) null else ({ T("—", dim = true) }),
+      onDelete = { Actions.removeActivityReminder(r.id) },
+    ) { reminder = r }
+  }
+  reminder?.let { r -> AppSheet({ reminder = null }) { ReminderForm(r, Store.data.activityReminders.any { it.id == r.id }, close) } }
   sheet?.let { sh ->
     AppSheet({ sheet = null }) {
       when (sh) {
@@ -648,6 +722,51 @@ fun Activity() {
     }
   }
   editing?.let { e -> AppSheet({ editing = null }) { WorkoutEdit(e, close) } }
+}
+
+private val EVERY = listOf(1, 2, 3, 7)
+private val MINUTES = (0..55 step 5).toList()
+
+private fun two(n: Int) = n.toString().padStart(2, '0')
+
+private fun clock(h: Int, m: Int) = two(h) + ":" + two(m)
+
+@Composable
+private fun ReminderForm(r0: ActivityReminder, exists: Boolean, onDone: () -> Unit) {
+  val dict = L
+  var r by remember { mutableStateOf(r0) }
+  var steps by remember { mutableStateOf(Math.round(r0.steps).toString()) }
+  SheetTitle(dict[if (exists) "activity.remind.edit" else "activity.remind.new"])
+  Segmented(r.kind, listOf("steps" to dict["activity.remind.kindSteps"], "task" to dict["activity.remind.kindTask"])) { r = r.copy(kind = it) }
+  if (r.kind == "steps") Field(steps, { steps = it }, Modifier.fillMaxWidth(), label = dict["activity.remind.stepsLabel"], suffix = dict["units.steps"])
+  else {
+    Field(r.text, { r = r.copy(text = it) }, Modifier.fillMaxWidth(), label = dict["activity.remind.taskLabel"], numeric = false, placeholder = dict["activity.remind.taskPh"])
+    val names = Store.data.workoutTemplates.map { it.name }.take(8)
+    if (names.isNotEmpty()) Wrap(6.dp) { for (n in names) Chip(n, active = r.text == n) { r = r.copy(text = n) } }
+    T(dict["activity.remind.taskNote"], dim = true, size = 12)
+  }
+  T(dict["activity.remind.every"] + ": " + if (r.everyDays <= 1) dict["activity.remind.daily"] else dict.t("activity.remind.everyN", r.everyDays), dim = true, size = 13)
+  Segmented(r.everyDays, EVERY.map { it to it.toString() }) { r = r.copy(everyDays = it) }
+  T(dict["activity.remind.time"], dim = true, size = 13)
+  Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+    Wheel(range(0, 23), r.hour, 72.dp, ::two) { r = r.copy(hour = it) }
+    T(":", size = 26, bold = true)
+    Wheel(MINUTES, r.minute - r.minute % 5, 72.dp, ::two) { r = r.copy(minute = it) }
+  }
+  DateStep(dict["activity.remind.start"], r.start) { r = r.copy(start = it) }
+  Toggle(dict["activity.remind.on"], r.on) { r = r.copy(on = it) }
+  val n = steps.replace(" ", "").replace(',', '.').toDoubleOrNull()
+  val ok = if (r.kind == "steps") n != null && n >= 100 else r.text.isNotBlank()
+  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    if (exists) Button(dict["common.delete"], Modifier.weight(1f), kind = "ghost", icon = "trash") {
+      Actions.removeActivityReminder(r.id)
+      onDone()
+    }
+    Button(dict["common.save"], Modifier.weight(2f), enabled = ok) {
+      Actions.saveActivityReminder(r.copy(steps = n ?: r.steps, text = r.text.trim()))
+      onDone()
+    }
+  }
 }
 
 // ---- heart -----------------------------------------------------------------------------
@@ -691,6 +810,7 @@ fun Heart() {
       recent.map { shortLabel(it.date) },
       listOf(Series(recent.map { it.systolic }, c.danger), Series(recent.map { it.diastolic }, c.water)),
       bands = listOf(Band(60.0, 80.0, c.ok.a(0.1f)), Band(90.0, 120.0, c.ok.a(0.1f)), Band(140.0, 220.0, c.danger.a(0.08f))),
+      xs = recent.map { it.time },
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       T("● ${dict["heart.upper"]}", size = 12, color = c.danger)
@@ -698,7 +818,7 @@ fun Heart() {
       T(dict["heart.normBands"], size = 12, dim = true)
     }
     T(dict["heart.pulseChart"], Modifier.padding(top = 6.dp), dim = true, size = 13)
-    LineChart(recent.map { shortLabel(it.date) }, listOf(Series(recent.map { it.pulse }, c.accent)), bands = listOf(Band(60.0, 100.0, c.ok.a(0.1f))), height = 140.dp)
+    LineChart(recent.map { shortLabel(it.date) }, listOf(Series(recent.map { it.pulse }, c.accent)), bands = listOf(Band(60.0, 100.0, c.ok.a(0.1f))), height = 140.dp, xs = recent.map { it.time })
   }
   Card {
     H(dict["heart.classification"])
@@ -797,6 +917,7 @@ fun Body() {
         weights.map { shortLabel(it.date) },
         listOf(Series(weights.map { it.weightKg }, c.accent.a(0.4f)), Series(smooth, c.accent)),
         bands = listOf(Band(hw.min, hw.max, c.ok.a(0.1f))),
+        xs = weights.map { it.time },
       )
       T(dict["body.trendNote"], dim = true, size = 12)
       if (weights.size > 1) T(dict.change(smooth.last() - smooth.first(), humanDate(weights[0].date, dict)))

@@ -283,7 +283,7 @@ fun BodyForm(onDone: (() -> Unit)? = null) {
     }
     if (navy != null && parseNum(fat) == null) T(L.t("body.navy", navy), dim = true, size = 13)
     if (pts.size >= 2) {
-      LineChart(pts.map { shortLabel(it.third) }, listOf(Series(pts.map { it.second }, c.accent.a(0.4f)), Series(trend, c.accent)), height = 140.dp)
+      LineChart(pts.map { shortLabel(it.third) }, listOf(Series(pts.map { it.second }, c.accent.a(0.4f)), Series(trend, c.accent)), height = 140.dp, xs = pts.map { it.first })
       if (prevAvg != null) T(L.avgLine(prevAvg, if (draft != null) trend.last() else null), dim = true, size = 13)
     }
     Button(L["common.save"], Modifier.fillMaxWidth()) {

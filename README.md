@@ -52,19 +52,23 @@
 - **Fast food logging without AI** — recent foods, favourites, a bundled offline database
   (CIS dishes plus ~2300 European foods from ANSES-CIQUAL), [Open Food Facts](https://openfoodfacts.org)
   and USDA search, barcodes, counting by pieces, custom foods based on an existing product,
-  editable log entries and importable food packs.
+  editable log entries and importable food packs. Forgot to log a day? Fill it in with an
+  estimate (as usual, ate little or a lot, carb-heavy, sweet, fatty, high-protein).
 - **Energy balance** — intake vs expenditure (BMR × lifestyle + workouts + steps), surplus or
   deficit converted into estimated fat mass; optional adaptive targets.
 - **Water** — one big button for water and a separate one for other drinks, charts up to a year, recommended
   range and a clearly marked dangerous amount (hyponatremia).
 - **Activity** — background step counting from the phone's hardware sensor (no Google Fit
-  needed) or Health Connect, MET-based workout templates, custom workouts.
-- **Heart** — blood pressure and pulse log with ACC/AHA classification and heart-rate zones.
+  needed) or Health Connect, MET-based workout templates, custom workouts, and reminders such as
+  "walk 5000 steps" or "warm-up every 2 days" that stay quiet once it is done.
+- **Heart** — blood pressure and pulse log with ACC/AHA classification and heart-rate zones;
+  charts on a real time scale.
 - **Body** — weight trend (time-weighted average), body fat (measured, US Navy or BMI-based
   estimate), BMI, waist-to-height ratio, healthy weight range.
 - **Pantry** (optional) — what you have at home, purchase and expiry dates, a freshness bar,
-  opened packages, how much is left and a reminder the day before a product expires; a shopping
-  list, eaten / thrown-away statistics and history. Share it with your family through one code:
+  opened packages, how much is left and a reminder the day before a product expires; eat or throw
+  away all or part of a product; dish ideas from what is at home, a shopping list, prompts for AI
+  chats with your product list, eaten / thrown-away statistics and history. Share it with your family through one code:
   no accounts, end-to-end encrypted.
 - **Tips** — fresh air, drinking water, cancer prevention, sun, back health, sleep, nutrition.
 - **Yours to configure** — English and Russian, sections on/off, theme and accent colour,

@@ -44,6 +44,7 @@ table { width: 100%; border-collapse: collapse; font-size: 15px; }
 td, th { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 code { font-size: 14px; word-break: break-all; user-select: all; color: var(--text); }
 details { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 22px; margin-bottom: 12px; }
+.grid + details { margin-top: 16px; }
 summary { cursor: pointer; font-weight: 700; }
 details p { color: var(--muted); margin: 10px 0 0; }
 footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; padding: 28px 0 40px; margin-top: 40px; }

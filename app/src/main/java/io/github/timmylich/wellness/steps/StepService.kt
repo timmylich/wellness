@@ -169,6 +169,10 @@ object StepStore {
     return pending.keys().asSequence().associateWith { pending.getDouble(it) }
   }
 
+  /** Steps counted on [day] but not drained into the app data yet. */
+  @Synchronized
+  fun pending(c: Context, day: String): Double = JSONObject(prefs(c).getString("pending", "{}")!!).optDouble(day, 0.0)
+
   fun setEnabled(c: Context, on: Boolean) = prefs(c).edit().putBoolean("enabled", on).apply()
 
   fun enabled(c: Context) = prefs(c).getBoolean("enabled", false)

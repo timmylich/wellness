@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import io.github.timmylich.wellness.lib.Range
 import io.github.timmylich.wellness.lib.rangeStatus
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.log10
@@ -249,13 +250,17 @@ fun BarChart(
 
 /** Smooth path through points (Catmull-Rom as cubic Béziers). */
 private fun smoothPath(pts: List<Offset>): Path = Path().apply {
+  // Slope at a point from its neighbours (Catmull-Rom on even spacing); handles stay inside the
+  // segment, so uneven spacing never loops back.
+  fun slope(a: Offset, b: Offset) = if (b.x - a.x > 0f) (b.y - a.y) / (b.x - a.x) else 0f
   moveTo(pts[0].x, pts[0].y)
   for (i in 0 until pts.size - 1) {
-    val p0 = pts.getOrElse(i - 1) { pts[i] }
     val p1 = pts[i]
     val p2 = pts[i + 1]
-    val p3 = pts.getOrElse(i + 2) { p2 }
-    cubicTo(p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6, p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6, p2.x, p2.y)
+    val s1 = slope(pts.getOrElse(i - 1) { p1 }, p2)
+    val s2 = slope(p1, pts.getOrElse(i + 2) { p2 })
+    val h = (p2.x - p1.x) / 3
+    cubicTo(p1.x + h, p1.y + s1 * h, p2.x - h, p2.y - s2 * h, p2.x, p2.y)
   }
 }
 
@@ -268,6 +273,8 @@ fun LineChart(
   minY: Double? = null,
   maxY: Double? = null,
   format: (Double) -> String = { fmt(it, 1) },
+  /** X positions (e.g. epoch ms): points are spaced by time, not evenly. */
+  xs: List<Long>? = null,
 ) {
   val pal = c
   val measurer = rememberTextMeasurer()
@@ -301,10 +308,14 @@ fun LineChart(
     val padT = with(d) { PAD_T.toPx() }
     val cw = w - padL - padR
     val ch = h - padB - padT
-    fun x(i: Int) = padL + if (labels.size <= 1) cw / 2 else i.toFloat() / (labels.size - 1) * cw
+    val span = xs?.let { it.last() - it.first() }?.takeIf { it > 0 }
+    fun x(i: Int) = padL + when {
+      labels.size <= 1 -> cw / 2
+      xs != null && span != null -> (xs[i] - xs[0]).toFloat() / span * cw
+      else -> i.toFloat() / (labels.size - 1) * cw
+    }
     fun y(v: Double) = (padT + ch - ((v.coerceIn(lo, hi) - lo) / (if (hi == lo) 1.0 else hi - lo)) * ch).toFloat()
-    val every = ceil(labels.size / 7.0).toInt().coerceAtLeast(1)
-    fun idx(x: Float) = if (labels.size <= 1) 0 else (((x - padL) / (if (cw == 0f) 1f else cw)) * (labels.size - 1)).roundToInt().coerceIn(0, labels.size - 1)
+    fun idx(px: Float) = labels.indices.minByOrNull { abs(x(it) - px) } ?: 0
     val sel = finger?.let(::idx) ?: pinned?.takeIf { it < labels.size }
     Canvas(Modifier.fillMaxWidth().height(height).scrub(w to labels.size, { finger = it }) { x -> idx(x).let { pinned = if (pinned == it) null else it } }) {
       for (b in bands) drawRect(b.color, Offset(padL, y(b.to)), Size(cw, max(0f, y(b.from) - y(b.to))))
@@ -314,10 +325,13 @@ fun LineChart(
         val t = measurer.measure(fmt(v, 1), label)
         drawText(t, topLeft = Offset(padL - 4.dp.toPx() - t.size.width, y(v) - t.size.height / 2f))
       }
+      // About 7 labels across, never overlapping (points may crowd on a time axis).
+      var free = Float.NEGATIVE_INFINITY
       labels.forEachIndexed { i, l ->
-        if (i % every != 0) return@forEachIndexed
+        if (x(i) < free) return@forEachIndexed
         val t = measurer.measure(l, label)
         drawText(t, topLeft = Offset(x(i) - t.size.width / 2f, h - t.size.height))
+        free = x(i) + max(t.size.width + 6.dp.toPx(), cw / 7)
       }
       for (s in shown) {
         // Smooth segments broken at gaps; single points get a dot.

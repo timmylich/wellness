@@ -6,6 +6,33 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Activity reminders: walk at least N steps or do a task (e.g. a warm-up) every 1, 2, 3 or 7
+  days at a chosen time. A reminder is skipped when the steps are already walked or a workout
+  with the task's name is logged in that period. One inexact alarm, re-set after a reboot.
+- "Fill in yesterday": when under a quarter of the calorie target was logged the day before,
+  the overview offers an estimated day (as usual, ate little or a lot, carb-heavy, sweet, fatty,
+  high-protein) or can be declined. The estimate is one food entry that can be edited or deleted.
+- Pantry: eat or throw away part of a product. The edit form has a slider for the part; the rest
+  stays in the pantry. Partial entries show in the history with their share.
+- Pantry: when a product runs out, a slider splits what was left into eaten and thrown away;
+  moving it pauses the countdown until saved. Undo takes back both entries.
+
+### Changed
+
+- Heart and body charts space points by time, so a month between measurements looks longer than
+  three days.
+- Pantry statistics count a product once even when it was used up in parts.
+
+- The "fill in yesterday" card slides away after an answer.
+
+### Fixed
+
+- The app opened on Pantry a moment after showing the overview: the Pantry tab chips asked the
+  outer tab pager to scroll to them.
+- Website: space above the "Crypto addresses" block.
+
 ## [0.8.0] — 2026-11-16
 
 **Added**

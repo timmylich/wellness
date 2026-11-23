@@ -70,6 +70,8 @@ UI text. A unit test checks that every key the code uses exists in both language
   AppData when the app is open; a boot receiver restarts the service.
 - Steps, `healthConnect` source (`lib/System.kt`): daily totals are read on resume and every
   5 minutes; while Health Connect is missing or not connected the device counter is used.
+- Activity reminders (`lib/ActivityReminders.kt`, `AppData.activityReminders`) and the
+  "fill in yesterday" estimate (`lib/Autofill.kt`).
 - Notifications (`lib/System.kt`, `Reminders`): local only, AlarmManager, no Firebase. See
   [notifications.md](notifications.md).
 - Backups (`lib/Backup.kt`): Storage Access Framework or the share sheet; photos of health records

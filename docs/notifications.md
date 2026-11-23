@@ -16,6 +16,7 @@ Current uses:
 | --- | --- |
 | Pantry expiry | 10:00 the day before a product expires (`screens/PantryHealth.kt`) |
 | App update | Once per new version found on GitHub Releases, checked at most daily (`Updates` in `lib/System.kt`) |
+| Activity reminders | At the chosen time every N days, unless already done (`lib/ActivityReminders.kt`; one alarm for the nearest reminder, re-set by a boot receiver) |
 | Backup | 30 days after the last backup or postponement (`BackupPrompt` in `screens/Settings.kt`); the app also shows the reminder as a dialog when opened |
 
 The step counter's foreground service (`StepService.kt`) also shows a silent, minimum-priority

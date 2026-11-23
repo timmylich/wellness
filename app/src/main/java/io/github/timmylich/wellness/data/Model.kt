@@ -184,6 +184,22 @@ data class BodyEntry(
   val heightCm: Double? = null,
 )
 
+/** A repeating activity reminder (Activity section); skipped when already done. */
+@Serializable
+data class ActivityReminder(
+  val id: String,
+  /** steps: walk at least [steps] that day | task: [text], e.g. a warm-up */
+  val kind: String = "task",
+  val text: String = "",
+  val steps: Double = 5000.0,
+  /** Every N days, counted from [start]. */
+  val everyDays: Int = 1,
+  val hour: Int = 18,
+  val minute: Int = 0,
+  val start: String,
+  val on: Boolean = true,
+)
+
 @Serializable
 data class NotificationSettings(
   val enabled: Boolean = false,
@@ -243,6 +259,8 @@ data class Meta(
   val backupAt: Long? = null,
   /** Last time the backup reminder was postponed. */
   val backupRemindedAt: Long? = null,
+  /** Day for which the "fill in the day" offer was answered. */
+  val autofillAsked: String? = null,
 )
 
 @Serializable
@@ -289,6 +307,8 @@ data class PantryOutcome(
   val at: Long = 0,
   /** Who marked it, on a shared list. */
   val by: String? = null,
+  /** Only [share] of the package; the rest stayed in the pantry (not counted as a whole product). */
+  val partial: Boolean? = null,
 )
 
 @Serializable
@@ -324,6 +344,7 @@ data class AppData(
   val shopping: List<ShoppingItem> = emptyList(),
   val pantryLog: List<PantryOutcome> = emptyList(),
   val health: List<HealthRecord> = emptyList(),
+  val activityReminders: List<ActivityReminder> = emptyList(),
 )
 
 /**

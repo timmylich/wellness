@@ -114,6 +114,12 @@ object Actions {
 
   fun removeBody(id: String) = set { s -> s.copy(body = s.body.filterNot { it.id == id }) }
 
+  fun saveActivityReminder(r: ActivityReminder) = set { s ->
+    s.copy(activityReminders = if (s.activityReminders.any { it.id == r.id }) s.activityReminders.map { if (it.id == r.id) r else it } else s.activityReminders + r)
+  }
+
+  fun removeActivityReminder(id: String) = set { s -> s.copy(activityReminders = s.activityReminders.filterNot { it.id == id }) }
+
   // ---- pantry & health records ----------------------------------------------------------
 
   fun savePantryItem(p: PantryItem) = set { s ->
@@ -146,9 +152,26 @@ object Actions {
     s.copy(pantry = s.pantry.filterNot { it.id == p.id }, pantryLog = (s.pantryLog + o).takeLast(1000))
   }
 
-  /** Undo [finishPantryItem]: the product comes back, the history entry goes. */
-  fun undoFinish(p: PantryItem, outcomeId: String) = set { s ->
-    s.copy(pantry = s.pantry.filterNot { it.id == p.id } + p, pantryLog = s.pantryLog.filterNot { it.id == outcomeId })
+  /** Eat or throw away [part] of the package (0…left); the rest stays. */
+  fun usePantryPart(p: PantryItem, kind: String, part: Double, by: String? = null) = set { s ->
+    val o = PantryOutcome(uid(), todayKey(), p.name, kind, part, System.currentTimeMillis(), by, partial = true)
+    s.copy(pantry = s.pantry.map { if (it.id == p.id) it.copy(left = (it.left - part).coerceAtLeast(0.01)) else it }, pantryLog = (s.pantryLog + o).takeLast(1000))
+  }
+
+  /**
+   * A finished product of which [wasted] (share of the package) was thrown away and the rest eaten:
+   * one whole eaten outcome ([eatenId]) plus a partial wasted one ([wastedId]).
+   */
+  fun finishSplit(p: PantryItem, wasted: Double, eatenId: String, wastedId: String, by: String? = null) = set { s ->
+    val now = System.currentTimeMillis()
+    val thrown = PantryOutcome(wastedId, todayKey(), p.name, "wasted", wasted, now, by, partial = true)
+    val eaten = PantryOutcome(eatenId, todayKey(), p.name, "eaten", 1.0, now, by)
+    s.copy(pantry = s.pantry.filterNot { it.id == p.id }, pantryLog = (s.pantryLog + thrown + eaten).takeLast(1000))
+  }
+
+  /** Undo [finishPantryItem] / [finishSplit]: the product comes back, the history entries go. */
+  fun undoFinish(p: PantryItem, outcomeIds: Collection<String>) = set { s ->
+    s.copy(pantry = s.pantry.filterNot { it.id == p.id } + p, pantryLog = s.pantryLog.filterNot { it.id in outcomeIds })
   }
 
   fun updateOutcome(o: PantryOutcome) = set { s -> s.copy(pantryLog = s.pantryLog.map { if (it.id == o.id) o else it }) }

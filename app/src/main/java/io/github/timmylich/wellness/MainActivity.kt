@@ -171,6 +171,8 @@ private fun Root() {
         PantryShare.watch(ctx, n.enabled && n.shopping, dict.lang.code)
       }
       LaunchedEffect(Unit) { Updates.maybeCheck(ctx, dict) }
+      // Activity reminders: one alarm for the nearest one, re-set whenever they or the switch change.
+      LaunchedEffect(Store.data.activityReminders, n.enabled) { io.github.timmylich.wellness.lib.ActivityReminders.schedule(ctx) }
       if (!meta.onboarded) Onboarding() else NavHost { AppScreen(it) }
       DonationPrompt()
       BackupPrompt()
