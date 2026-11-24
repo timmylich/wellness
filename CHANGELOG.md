@@ -6,6 +6,13 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-11-24
+
+### Fixed
+
+- The store APK is now `wellness-X.store.apk`, listed after `wellness-X.apk`: in 0.9.0 it came
+  first, so 0.8.0's "Download APK" button would have offered the build without update checks.
+
 ## [0.9.0] — 2026-11-24
 
 ### Added
@@ -26,7 +33,7 @@ uses [Semantic Versioning](https://semver.org/).
 - Heart and body charts space points by time, so a month between measurements looks longer than
   three days.
 - Pantry statistics count a product once even when it was used up in parts.
-- Releases also carry `wellness-X-store.apk` and the `.aab` without the GitHub update check, for
+- Releases also carry `wellness-X.store.apk` and the `.aab` without the GitHub update check, for
   app stores; the update check never offers the store APK.
 - New store listing texts and promo screenshots (RU / EN); fresh screenshots in the README and
   on the website.

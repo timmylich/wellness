@@ -54,7 +54,7 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           OUT="wellness-$VERSION.apk"
-          STORE="wellness-$VERSION-store.apk"
+          STORE="wellness-$VERSION.store.apk"
           sign() {
             "$BT/zipalign" -f -p 4 "$1" aligned.apk
             "$BT/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD \
@@ -87,7 +87,8 @@ jobs:
         with:
           name: Wellness ${{ env.VERSION }}
           body_path: notes.md
-          # The GitHub APK goes first: older versions take the first .apk asset for updates.
+          # Assets are listed by name and older versions offer the first .apk for updates:
+          # "wellness-X.apk" sorts before "wellness-X.store.apk".
           files: |
             ${{ env.APK }}
             ${{ env.APK }}.sha256

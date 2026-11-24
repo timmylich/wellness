@@ -4,7 +4,7 @@ Everything a store asks for is already in the repository:
 
 | What | Where |
 | --- | --- |
-| APK and AAB (signed) | GitHub → Releases (built by `.github/workflows/release.yml`). For stores upload `wellness-X-store.apk` or the `.aab`: they have no GitHub update check, which stores forbid. `wellness-X.apk` is for direct downloads |
+| APK and AAB (signed) | GitHub → Releases (built by `.github/workflows/release.yml`). For stores upload `wellness-X.store.apk` or the `.aab`: they have no GitHub update check, which stores forbid. `wellness-X.apk` is for direct downloads |
 | Icon 512×512 | `fastlane/metadata/android/*/images/icon.png` |
 | Feature graphic 1024×500 | `fastlane/metadata/android/*/images/featureGraphic.png` |
 | Short / full description | `fastlane/metadata/android/*/short_description.txt`, `full_description.txt` |
