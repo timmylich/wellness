@@ -1,0 +1,5 @@
+• Activity reminders: steps or your own task every N days; skipped when already done.
+• Forgot to log a day? Fill it in with an estimate.
+• Pantry: eat or throw away part of a package.
+• Heart and body charts on a real time scale.
+• Fixed: the app jumped to Pantry at start.

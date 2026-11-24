@@ -25,3 +25,4 @@ keystore.properties
 
 # macOS
 .DS_Store
+dist/

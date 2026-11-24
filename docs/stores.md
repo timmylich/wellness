@@ -4,21 +4,21 @@ Everything a store asks for is already in the repository:
 
 | What | Where |
 | --- | --- |
-| APK and AAB (signed) | GitHub → Releases (built by `.github/workflows/release.yml`) |
+| APK and AAB (signed) | GitHub → Releases (built by `.github/workflows/release.yml`). For stores upload `wellness-X-store.apk` or the `.aab`: they have no GitHub update check, which stores forbid. `wellness-X.apk` is for direct downloads |
 | Icon 512×512 | `fastlane/metadata/android/*/images/icon.png` |
 | Feature graphic 1024×500 | `fastlane/metadata/android/*/images/featureGraphic.png` |
 | Short / full description | `fastlane/metadata/android/*/short_description.txt`, `full_description.txt` |
 | What's new | `fastlane/metadata/android/*/changelogs/<versionCode>.txt` |
 | Privacy policy URL | `https://github.com/timmylich/wellness/blob/main/docs/PRIVACY.md` |
-| Screenshots | add 4–8 PNGs to `fastlane/metadata/android/*/images/phoneScreenshots/` |
+| Screenshots | `fastlane/metadata/android/*/images/phoneScreenshots/1–4.png`: 1080×1920 slices of one promo panorama, upload in order |
 
 Typical form answers: category **Health & Fitness**; contains ads **no**; in-app purchases
 **no**; target audience **18+** (health data); data collected **none** (everything stays on the
 device); content rating questionnaire: no violence, no user-generated sharing → "Everyone / 3+".
 "Medical device": no, informational only.
 
-Always upload the **same signed file** from GitHub Releases, so all stores can update each
-other's installs.
+Always upload the **same signed store file** from GitHub Releases (all builds share one key), so all
+stores can update each other's installs.
 
 ## Store by store
 

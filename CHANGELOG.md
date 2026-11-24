@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-24
+
 ### Added
 
 - Activity reminders: walk at least N steps or do a task (e.g. a warm-up) every 1, 2, 3 or 7
@@ -24,6 +26,10 @@ uses [Semantic Versioning](https://semver.org/).
 - Heart and body charts space points by time, so a month between measurements looks longer than
   three days.
 - Pantry statistics count a product once even when it was used up in parts.
+- Releases also carry `wellness-X-store.apk` and the `.aab` without the GitHub update check, for
+  app stores; the update check never offers the store APK.
+- New store listing texts and promo screenshots (RU / EN); fresh screenshots in the README and
+  on the website.
 
 - The "fill in yesterday" card slides away after an answer.
 

@@ -31,15 +31,7 @@
 ---
 
 <p align="center">
-  <img src="docs/screenshots/summary.jpg" width="24%" alt="Daily summary" />
-  <img src="docs/screenshots/add_food.jpg" width="24%" alt="Adding food" />
-  <img src="docs/screenshots/heart.jpg" width="24%" alt="Blood pressure and pulse" />
-  <img src="docs/screenshots/tips.jpg" width="24%" alt="Health tips" />
-</p>
-<p align="center">
-  <img src="docs/screenshots/pantry.jpg" width="24%" alt="Pantry with expiry dates" />
-  <img src="docs/screenshots/pantry_add_product.jpg" width="24%" alt="Adding a pantry product" />
-  <img src="docs/screenshots/more.jpg" width="24%" alt="Settings and more" />
+  <img src="docs/screenshots/promo_en.jpg" width="100%" alt="Wellness: daily summary, food log, pantry and heart charts" />
 </p>
 
 ## Features
@@ -71,7 +63,7 @@
   chats with your product list, eaten / thrown-away statistics and history. Share it with your family through one code:
   no accounts, end-to-end encrypted.
 - **Tips** — fresh air, drinking water, cancer prevention, sun, back health, sleep, nutrition.
-- **Yours to configure** — English and Russian, sections on/off, theme and accent colour,
+- **Yours to configure** — every section can be turned off; English and Russian, theme and accent colour,
   animations, goal pace slider, custom nutrient limits, JSON export/import with a reminder
   every 30 days (save to Google Drive or send to Telegram).
 
@@ -168,21 +160,27 @@ Icons: Lucide (ISC).
 ## По-русски
 
 **Wellness** — бесплатный трекер здоровья с открытым кодом. Без рекламы, регистрации, слежки и
-сервисов Google: все данные хранятся только на телефоне.
+сервисов Google: все данные хранятся только на телефоне. Каждый раздел можно отключить, а нормы,
+цели, кнопки, тему и цвет — настроить под себя.
+
+<p align="center">
+  <img src="docs/screenshots/promo_ru.jpg" width="100%" alt="Wellness: сводка, дневник питания, продукты дома и графики давления" />
+</p>
 
 - **Быстрое и нативное**: Kotlin и Jetpack Compose, запуск меньше чем за полсекунды, плавные
   свайпы и графики, APK 1,8 МБ, без JavaScript-движка и сервисов Google.
 - **Еда**: 12 шкал с личными диапазонами (минимум — цель — максимум), офлайн-база продуктов,
   поиск в Open Food Facts и USDA, штрихкоды, счёт по штукам, свои продукты на основе готовых,
-  редактирование записей, энергобаланс, советы.
+  редактирование записей, энергобаланс, советы; если забыли записать день — заполнение оценкой.
 - **Вода**: большая кнопка для воды и отдельная для напитков, графики, норма и опасный объём.
 - **Активность**: фоновый подсчёт шагов датчиком телефона (без Google Fit) или Health Connect,
-  шаблоны тренировок.
-- **Сердце**: давление и пульс, классификация, пульсовые зоны.
+  шаблоны тренировок, напоминания («8000 шагов», «разминка раз в 2 дня»).
+- **Сердце**: давление и пульс, классификация, пульсовые зоны, графики по реальному времени.
 - **Тело**: вес со взвешенным средним, % жира, талия, ИМТ, подходящий вес.
 - **Продукты** (по желанию): что есть дома, сроки годности, полоса свежести, вскрытые
-  упаковки, сколько осталось и напоминание за день до окончания срока; список покупок,
-  статистика «съедено / выброшено» и история. Можно вести вместе с семьёй по одному коду — без
+  упаковки, сколько осталось и напоминание за день до окончания срока; «съедено / выброшено»
+  целиком или частично, идеи блюд из того, что есть, запросы для ИИ-чатов, список покупок,
+  статистика и история. Можно вести вместе с семьёй по одному коду — без
   регистрации, со сквозным шифрованием.
 - **Советы**: воздух, вода, профилактика рака, солнце, спина, сон.
 

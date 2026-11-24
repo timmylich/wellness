@@ -1,9 +1,15 @@
-<p>Wellness is a free, open-source health tracker that keeps every byte of your data on your phone. No ads, no accounts, no analytics, no Google services.</p>
-<p><b>Food</b> — 12 daily scales (calories, protein, fat, carbs, sugar, added sugar, sodium, fibre, saturated and trans fat, cholesterol, potassium) with personal minimum, target and maximum based on your profile, goal pace and activity. Offline food database, Open Food Facts and USDA search, barcodes, counting by pieces, custom foods, energy balance and advice.</p>
-<p><b>Water</b> — one tap for water, a separate button for other drinks, charts, the recommended range and a clearly marked dangerous amount.</p>
-<p><b>Activity</b> — background step counting from the phone's hardware sensor or Health Connect, workout templates with calorie estimates.</p>
-<p><b>Heart</b> — blood pressure and pulse log with ACC/AHA classification and heart-rate zones.</p>
-<p><b>Body</b> — weight trend with a time-weighted average, body fat estimates, BMI, waist-to-height ratio, healthy weight range.</p>
-<p><b>Pantry</b> (optional) — products at home with expiry dates, a freshness bar, opened packages, how much is left and a reminder before a product expires. A shopping list, eaten / thrown-away statistics and history. Share it all with your family through one code: no accounts, encrypted on the phone.</p>
-<p><b>Tips</b> — fresh air, drinking water, cancer prevention, sun, back health, sleep and nutrition, with sources.</p>
-<p>Optional network access: food search (Open Food Facts, USDA) and the shared pantry (end-to-end encrypted). Reminds you to back up every 30 days. Wellness is not a medical device.</p>
+<p>Wellness is a free, open-source health tracker that keeps all your data on your phone. No ads, no accounts, no analytics, no Google services.</p>
+<p>Every section can be turned off, and the app adapts to you: personal nutrient limits, step goal, water buttons, theme, colour and language. What you do not need stays out of the way.</p>
+<p><b>FOOD</b></p>
+<ul><li>12 daily scales: calories, protein, fat, carbs, sugar, added sugar, sodium, fibre, saturated and trans fat, cholesterol, potassium. Personal targets based on your profile, goal and activity.</li><li>Offline food database, Open Food Facts and USDA search, barcodes, counting by pieces, custom foods.</li><li>Weekly energy balance and nutrition advice.</li><li>Forgot to log a day? Fill it in with an estimate: as usual, little, a lot, sweet, fatty, high-protein.</li></ul>
+<p><b>WATER</b></p>
+<ul><li>One tap for water and a separate button for other drinks, charts, the recommended range and a clearly marked dangerous amount.</li></ul>
+<p><b>ACTIVITY</b></p>
+<ul><li>Background step counting with the phone&#x27;s sensor, or Health Connect.</li><li>Workout templates with calorie estimates.</li><li>Reminders such as &quot;walk 8000 steps&quot; or &quot;warm-up every 2 days&quot;. Already done? No reminder.</li></ul>
+<p><b>HEART AND BODY</b></p>
+<ul><li>Blood pressure and pulse with ACC/AHA classification and heart-rate zones.</li><li>Weight trend, body fat estimate, BMI, waist-to-height ratio, healthy weight range.</li><li>Charts on a real time scale: a month between readings looks longer than three days.</li></ul>
+<p><b>PANTRY (optional)</b></p>
+<ul><li>Expiry dates, a freshness bar, opened packages, how much is left and a reminder the day before a product expires.</li><li>Eaten or thrown away — all of it or part, with waste statistics.</li><li>Dish ideas from what you have at home, starting with what expires soon.</li><li>A shared pantry and shopping list for the family through one code: no accounts, end-to-end encrypted.</li><li>Ready-made prompts for AI chats with your product list.</li></ul>
+<p><b>TIPS</b></p>
+<ul><li>Fresh air, drinking water, cancer prevention, sun, back health, sleep and nutrition, with sources.</li></ul>
+<p>Internet is optional: food search, the shared pantry and the update check. Wellness is not a medical device.</p>

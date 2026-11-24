@@ -34,8 +34,13 @@ jobs:
           TAG=${GITHUB_REF_NAME#v}
           if [ "$APP" != "$TAG" ]; then echo "versionName $APP != tag $TAG"; exit 1; fi
 
+      # Two builds: the GitHub APK checks GitHub Releases for updates; the store APK and the
+      # AAB do not (stores update the app themselves and forbid self-updates).
       - name: Test and build
-        run: ./gradlew testDebugUnitTest assembleRelease bundleRelease --no-daemon
+        run: |
+          ./gradlew testDebugUnitTest assembleRelease --no-daemon
+          mkdir -p out && cp app/build/outputs/apk/release/app-release-unsigned.apk out/github-unsigned.apk
+          ./gradlew assembleRelease bundleRelease -PupdateCheck=false --no-daemon
 
       - name: Sign APK
         env:
@@ -49,11 +54,16 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           OUT="wellness-$VERSION.apk"
-          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-          "$BT/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD \
-            --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD --out "$OUT" aligned.apk
-          "$BT/apksigner" verify --print-certs "$OUT"
-          sha256sum "$OUT" > "$OUT.sha256"
+          STORE="wellness-$VERSION-store.apk"
+          sign() {
+            "$BT/zipalign" -f -p 4 "$1" aligned.apk
+            "$BT/apksigner" sign --ks release.jks --ks-pass env:KEYSTORE_PASSWORD \
+              --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD --out "$2" aligned.apk
+            "$BT/apksigner" verify --print-certs "$2"
+            sha256sum "$2" > "$2.sha256"
+          }
+          sign out/github-unsigned.apk "$OUT"
+          sign app/build/outputs/apk/release/app-release-unsigned.apk "$STORE"
           # App bundle (.aab) for stores that prefer it (RuStore, AppGallery, Amazon).
           AAB="wellness-$VERSION.aab"
           cp app/build/outputs/bundle/release/app-release.aab "$AAB"
@@ -61,6 +71,7 @@ jobs:
           rm release.jks aligned.apk
           echo "AAB=$AAB" >> "$GITHUB_ENV"
           echo "APK=$OUT" >> "$GITHUB_ENV"
+          echo "STORE=$STORE" >> "$GITHUB_ENV"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Release notes from CHANGELOG.md
@@ -76,8 +87,11 @@ jobs:
         with:
           name: Wellness ${{ env.VERSION }}
           body_path: notes.md
+          # The GitHub APK goes first: older versions take the first .apk asset for updates.
           files: |
             ${{ env.APK }}
             ${{ env.APK }}.sha256
+            ${{ env.STORE }}
+            ${{ env.STORE }}.sha256
             ${{ env.AAB }}
           draft: ${{ github.event_name == 'workflow_dispatch' }}

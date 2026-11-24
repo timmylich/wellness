@@ -156,7 +156,7 @@ object Updates {
         val tag = (j["tag_name"] as? JsonPrimitive)?.contentOrNull ?: return@runCatching null
         if ((j["draft"] as? JsonPrimitive)?.booleanOrNull == true || (j["prerelease"] as? JsonPrimitive)?.booleanOrNull == true) return@runCatching null
         val apk = (j["assets"] as? JsonArray)?.firstNotNullOfOrNull { a ->
-          ((a as? JsonObject)?.get("browser_download_url") as? JsonPrimitive)?.contentOrNull?.takeIf { it.endsWith(".apk") && it.startsWith("https://github.com/") }
+          ((a as? JsonObject)?.get("browser_download_url") as? JsonPrimitive)?.contentOrNull?.takeIf { it.endsWith(".apk") && !it.endsWith("-store.apk") && it.startsWith("https://github.com/") }
         }
         Release(tag.removePrefix("v").removePrefix("V"), (j["html_url"] as? JsonPrimitive)?.contentOrNull ?: "$REPO_URL/releases/latest", apk)
       } finally {
